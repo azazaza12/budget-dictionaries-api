@@ -12,6 +12,11 @@
 uv sync                  # поставить зависимости
 uv run uvicorn sigma.main:app --reload   # запуск API (FastAPI)
 
+# Миграции (alembic, конфиг в alembic.ini, среда в migrations/)
+uv run alembic revision --autogenerate -m "описание"   # новая миграция по моделям
+uv run alembic upgrade head        # накатить
+uv run alembic downgrade -1        # откатить на шаг
+
 uv run ruff check sigma tests    # линт (вкл. сложность: C901, PLR09xx, FAST)
 uv run ruff format sigma tests   # форматирование
 uv run basedpyright sigma tests  # проверка типов
