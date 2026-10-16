@@ -5,6 +5,7 @@ description = "Система управления экономией (Sigma): S
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "alembic>=1.20.0",
     "asyncpg>=0.32.0",
     "fastapi>=0.143.2",
     "pydantic-settings>=2.16.0",
