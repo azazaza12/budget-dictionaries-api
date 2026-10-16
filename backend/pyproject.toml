@@ -1,0 +1,120 @@
+[project]
+name = "sigma"
+version = "0.1.0"
+description = "Система управления экономией (Sigma): Savings Insights & Growth Management"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "asyncpg>=0.32.0",
+    "fastapi>=0.143.2",
+    "pydantic-settings>=2.16.0",
+    "sqlalchemy[asyncio]>=2.1.4",
+    "structlog>=26.1.0",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "basedpyright>=1.40.2",
+    "complexipy>=8.0.1",
+    "httpx2>=2.13.1",
+    "hypothesis>=6.170.0",
+    "import-linter>=2.15",
+    "pytest>=9.1.1",
+    "ruff>=0.17.0",
+]
+
+# ---------- Ruff ----------
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+src = ["."]  # flat layout: пакет в корне, как у Kraken/PostHog
+
+[tool.ruff.lint]
+# Дефолт ruff (E4, E7, E9, F) НЕ переопределяем — расширяем через extend-select.
+extend-select = [
+    "E",    # pycodestyle errors (полный набор поверх дефолтных E4/E7/E9)
+    "W",    # pycodestyle warnings
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "RUF",  # ruff-specific (вкл. RUF100: неиспользуемые noqa)
+    "C90",  # mccabe: цикломатическая сложность
+    "PL",   # pylint (вкл. PLR0915 too-many-statements и пр.)
+    # --- антислоп / типичные следы LLM-кода ---
+    "ERA",  # eradicate: закомментированный код
+    "T20",  # оставленные print() для отладки
+    "BLE",  # слепой except Exception
+    "TRY",  # стиль обработки исключений
+    "RET",  # лишние else после return и пр.
+    "ARG",  # неиспользуемые аргументы
+    "PERF", # антипаттерны производительности
+    "PTH",  # pathlib вместо os.path
+    "DTZ",  # datetime без таймзоны
+    "S",    # bandit: секреты в коде, requests без таймаута и пр.
+    "FAST", # fastapi: лишние response_model, не-async зависимости и пр.
+]
+ignore = [
+    "PLR0913",  # too-many-arguments — часто ложное срабатывание в конструкторах
+    "PLR2004",  # magic values — слишком шумно на старте
+    "TRY003",   # длинные сообщения в исключениях — шумно
+    "S101",     # assert — разрешён (в тестах нужен)
+    "RUF001", "RUF002", "RUF003",  # ambiguous unicode: русские тексты + англ. термины — норма
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.pylint]
+max-statements = 50
+max-branches = 12
+max-returns = 6
+
+# ---------- complexipy ----------
+# Когнитивная сложность (спецификация SonarSource), порог как у sonarjs на фронте
+[tool.complexipy]
+paths = ["sigma"]
+max-complexity-allowed = 15
+sort = "desc"
+
+# ---------- basedpyright ----------
+[tool.basedpyright]
+typeCheckingMode = "standard"
+include = ["sigma", "tests"]
+pythonVersion = "3.14"
+reportMissingTypeStubs = false
+reportUnusedImport = "error"
+reportUnusedVariable = "error"
+
+# ---------- pytest ----------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]  # flat layout: пакет sigma в корне
+
+# ---------- import-linter ----------
+# Архитектурные границы как код: lint-imports падает при нарушении.
+[tool.importlinter]
+root_package = "sigma"
+exclude_type_checking_imports = true
+
+# shared — нижний слой: модули могут его импортировать, он — никого из модулей.
+[[tool.importlinter.contracts]]
+name = "shared ниже модулей"
+type = "layers"
+layers = ["sigma.modules", "sigma.shared"]
+
+# presentation импортирует ТОЛЬКО facade: внутренности модуля под запретом.
+# NB: «запретить всё и разрешить список» (как у PostHog) здесь не работает —
+# при пересечении source/forbidden (родитель/потомок) контракт обнуляется,
+# поэтому внутренности перечислены явно.
+[[tool.importlinter.contracts]]
+name = "presentation импортирует только facade"
+type = "forbidden"
+source_modules = ["sigma.modules.*.presentation"]
+forbidden_modules = [
+    "sigma.modules.*.models",
+    "sigma.modules.*.repository",
+    "sigma.modules.*.domain",
+    "sigma.modules.*.features",
+]
