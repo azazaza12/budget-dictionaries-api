@@ -1,5 +1,3 @@
-"""Окружение alembic: async-движок, URL из настроек приложения."""
-
 import asyncio
 import importlib
 import pkgutil

@@ -1,5 +1,3 @@
-"""Настройки из переменных окружения (.env поддерживается)."""
-
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 

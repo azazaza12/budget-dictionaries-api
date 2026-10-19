@@ -1,5 +1,3 @@
-"""Composition root: сборка приложения. Запуск: uv run uvicorn sigma.main:app"""
-
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 

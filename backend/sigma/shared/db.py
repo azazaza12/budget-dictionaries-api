@@ -1,5 +1,3 @@
-"""Движок и сессии async SQLAlchemy. Движок один на приложение."""
-
 from collections.abc import AsyncIterator
 
 from sqlalchemy import MetaData
@@ -19,8 +17,6 @@ NAMING_CONVENTION = {
 
 
 class Base(DeclarativeBase):
-    """Общий базовый класс ORM: models.py всех модулей наследуют его."""
-
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
