@@ -4,3 +4,7 @@ class DictionariesFeatureError(Exception):
 
 class DuplicateDictionaryNameError(DictionariesFeatureError):
     pass
+
+
+class CategoryNotFoundError(DictionariesFeatureError):
+    pass
