@@ -38,6 +38,25 @@ def test_archive_category_archives_category_and_its_articles() -> None:
     assert article_repository.save.await_args_list == [call(article) for article in articles]
 
 
+def test_archive_category_does_not_save_archived_category() -> None:
+    category = Category(name="Транспорт", is_archived=True)
+    category_repository = MagicMock(spec=CategoryRepository)
+    category_repository.get = AsyncMock(return_value=category)
+    category_repository.save = AsyncMock()
+    article_repository = MagicMock(spec=BudgetArticleRepository)
+    article_repository.list_by_category = AsyncMock()
+    article_repository.save = AsyncMock()
+
+    archived_category = asyncio.run(
+        archive_category(category.id, category_repository, article_repository)
+    )
+
+    assert archived_category is category
+    category_repository.save.assert_not_awaited()
+    article_repository.list_by_category.assert_not_awaited()
+    article_repository.save.assert_not_awaited()
+
+
 def test_archive_category_rejects_unknown_category() -> None:
     category_id = uuid4()
     category_repository = MagicMock(spec=CategoryRepository)

@@ -16,6 +16,8 @@ async def archive_category(
     category = await category_repository.get(category_id)
     if category is None:
         raise CategoryNotFoundError(category_id)
+    if category.is_archived:
+        return category
 
     articles = await article_repository.list_by_category(category_id)
     category.archive()
