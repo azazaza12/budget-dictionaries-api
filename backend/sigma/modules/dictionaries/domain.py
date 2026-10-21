@@ -1,9 +1,10 @@
 from dataclasses import dataclass, field
+from typing import ClassVar
 from uuid import UUID, uuid4
 
 
 class DictionariesDomainError(Exception):
-    code: str
+    code: ClassVar[str]
 
 
 class InvalidDictionaryNameError(DictionariesDomainError):
@@ -13,9 +14,27 @@ class InvalidDictionaryNameError(DictionariesDomainError):
 class ArchivedCategoryError(DictionariesDomainError):
     code = "archived_category"
 
+    def __init__(self, category_id: UUID) -> None:
+        self.category_id = category_id
+        super().__init__(f"Category {category_id} is archived")
+
 
 class ArticleCategoryMismatchError(DictionariesDomainError):
     code = "article_category_mismatch"
+
+    def __init__(
+        self,
+        article_id: UUID,
+        expected_category_id: UUID,
+        provided_category_id: UUID,
+    ) -> None:
+        self.article_id = article_id
+        self.expected_category_id = expected_category_id
+        self.provided_category_id = provided_category_id
+        super().__init__(
+            f"Article {article_id} belongs to category {expected_category_id}, "
+            f"not {provided_category_id}"
+        )
 
 
 def clean_name(value: str) -> str:
@@ -56,7 +75,7 @@ class Category(BaseDictionary):
 
     def require_active(self) -> None:
         if self.is_archived:
-            raise ArchivedCategoryError(f"Category {self.id} is archived")
+            raise ArchivedCategoryError(self.id)
 
 
 @dataclass(slots=True, kw_only=True)
@@ -71,7 +90,9 @@ class BudgetArticle(BaseDictionary):
     def restore(self, current_category: Category) -> None:
         if current_category.id != self.category_id:
             raise ArticleCategoryMismatchError(
-                f"Article {self.id} does not belong to category {current_category.id}"
+                self.id,
+                self.category_id,
+                current_category.id,
             )
         current_category.require_active()
         self.is_archived = False
