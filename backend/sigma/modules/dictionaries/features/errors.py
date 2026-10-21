@@ -8,3 +8,7 @@ class DuplicateDictionaryNameError(DictionariesFeatureError):
 
 class CategoryNotFoundError(DictionariesFeatureError):
     pass
+
+
+class BudgetArticleNotFoundError(DictionariesFeatureError):
+    pass
