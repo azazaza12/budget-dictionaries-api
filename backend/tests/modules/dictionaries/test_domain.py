@@ -7,10 +7,26 @@ from sigma.modules.dictionaries.domain import (
     ArticleCategoryMismatchError,
     BudgetArticle,
     Category,
+    DictionariesDomainError,
     InvalidDictionaryNameError,
     clean_name,
     normalize_name,
 )
+
+
+@pytest.mark.parametrize(
+    ("error_type", "expected_code"),
+    [
+        (InvalidDictionaryNameError, "invalid_dictionary_name"),
+        (ArchivedCategoryError, "archived_category"),
+        (ArticleCategoryMismatchError, "article_category_mismatch"),
+    ],
+)
+def test_domain_errors_have_stable_codes(
+    error_type: type[DictionariesDomainError],
+    expected_code: str,
+) -> None:
+    assert error_type().code == expected_code
 
 
 def test_clean_name_collapses_whitespace() -> None:

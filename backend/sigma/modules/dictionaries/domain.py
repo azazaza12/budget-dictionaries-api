@@ -3,19 +3,19 @@ from uuid import UUID, uuid4
 
 
 class DictionariesDomainError(Exception):
-    pass
+    code: str
 
 
 class InvalidDictionaryNameError(DictionariesDomainError):
-    pass
+    code = "invalid_dictionary_name"
 
 
 class ArchivedCategoryError(DictionariesDomainError):
-    pass
+    code = "archived_category"
 
 
 class ArticleCategoryMismatchError(DictionariesDomainError):
-    pass
+    code = "article_category_mismatch"
 
 
 def clean_name(value: str) -> str:
