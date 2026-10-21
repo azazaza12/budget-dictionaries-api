@@ -6,9 +6,12 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sigma.modules.dictionaries import facade as facade_module
 from sigma.modules.dictionaries.domain import BudgetArticle, Category
-from sigma.modules.dictionaries.facade import DictionariesFacade
-from sigma.modules.dictionaries.features.errors import DuplicateDictionaryNameError
+from sigma.modules.dictionaries.facade import (
+    DictionariesFacade,
+    DuplicateDictionaryNameError,
+)
 from sigma.modules.dictionaries.repository import (
     SqlAlchemyBudgetArticleRepository,
     SqlAlchemyCategoryRepository,
@@ -34,6 +37,20 @@ def _awaited_call(mock: AsyncMock) -> tuple[tuple[object, ...], Mapping[str, obj
     awaited_call = mock.await_args
     assert awaited_call is not None
     return awaited_call.args, awaited_call.kwargs
+
+
+def test_facade_exports_public_errors_without_domain_entities() -> None:
+    assert set(facade_module.__all__) == {
+        "ArchivedCategoryError",
+        "ArticleCategoryMismatchError",
+        "BudgetArticleNotFoundError",
+        "CategoryNotFoundError",
+        "DictionariesDomainError",
+        "DictionariesFacade",
+        "DictionariesFeatureError",
+        "DuplicateDictionaryNameError",
+        "InvalidDictionaryNameError",
+    }
 
 
 def test_facade_builds_repositories_with_same_session() -> None:

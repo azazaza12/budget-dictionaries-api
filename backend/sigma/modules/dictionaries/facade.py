@@ -2,11 +2,24 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .domain import BudgetArticle, Category
+from .domain import (
+    ArchivedCategoryError,
+    ArticleCategoryMismatchError,
+    BudgetArticle,
+    Category,
+    DictionariesDomainError,
+    InvalidDictionaryNameError,
+)
 from .features.archive_article import archive_article as archive_article_feature
 from .features.archive_category import archive_category as archive_category_feature
 from .features.create_article import create_article as create_article_feature
 from .features.create_category import create_category as create_category_feature
+from .features.errors import (
+    BudgetArticleNotFoundError,
+    CategoryNotFoundError,
+    DictionariesFeatureError,
+    DuplicateDictionaryNameError,
+)
 from .features.list_articles import list_articles as list_articles_feature
 from .features.list_categories import list_categories as list_categories_feature
 from .features.move_article import move_article as move_article_feature
@@ -15,6 +28,18 @@ from .features.rename_category import rename_category as rename_category_feature
 from .features.restore_article import restore_article as restore_article_feature
 from .features.restore_category import restore_category as restore_category_feature
 from .repository import SqlAlchemyBudgetArticleRepository, SqlAlchemyCategoryRepository
+
+__all__ = (
+    "ArchivedCategoryError",
+    "ArticleCategoryMismatchError",
+    "BudgetArticleNotFoundError",
+    "CategoryNotFoundError",
+    "DictionariesDomainError",
+    "DictionariesFacade",
+    "DictionariesFeatureError",
+    "DuplicateDictionaryNameError",
+    "InvalidDictionaryNameError",
+)
 
 
 class DictionariesFacade:
