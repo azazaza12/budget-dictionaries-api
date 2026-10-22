@@ -13,4 +13,8 @@ def get_dictionaries_facade(
     return DictionariesFacade(session)
 
 
+def require_dictionaries_admin() -> None:
+    return None
+
+
 DictionariesFacadeDependency = Annotated[DictionariesFacade, Depends(get_dictionaries_facade)]
