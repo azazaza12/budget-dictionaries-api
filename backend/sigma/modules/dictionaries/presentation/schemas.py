@@ -1,0 +1,45 @@
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict
+
+
+class CategoryInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+
+
+class BudgetArticleInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    category_id: UUID
+
+
+class BudgetArticleCategoryInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    category_id: UUID
+
+
+class BudgetArticleNameInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+
+
+class CategoryView(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    is_archived: bool
+
+
+class BudgetArticleView(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    category_id: UUID
+    is_archived: bool
