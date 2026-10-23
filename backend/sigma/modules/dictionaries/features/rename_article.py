@@ -1,11 +1,9 @@
 from uuid import UUID
 
 from sigma.modules.dictionaries.domain import BudgetArticle, normalize_name
-from sigma.modules.dictionaries.features.errors import (
-    BudgetArticleNotFoundError,
-    DuplicateDictionaryNameError,
-)
 from sigma.modules.dictionaries.repository import BudgetArticleRepository
+
+from .errors import BudgetArticleNotFoundError, DuplicateDictionaryNameError
 
 
 async def rename_article(

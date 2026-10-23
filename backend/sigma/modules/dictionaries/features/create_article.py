@@ -1,14 +1,9 @@
 from uuid import UUID
 
 from sigma.modules.dictionaries.domain import BudgetArticle
-from sigma.modules.dictionaries.features.errors import (
-    CategoryNotFoundError,
-    DuplicateDictionaryNameError,
-)
-from sigma.modules.dictionaries.repository import (
-    BudgetArticleRepository,
-    CategoryRepository,
-)
+from sigma.modules.dictionaries.repository import BudgetArticleRepository, CategoryRepository
+
+from .errors import CategoryNotFoundError, DuplicateDictionaryNameError
 
 
 async def create_article(

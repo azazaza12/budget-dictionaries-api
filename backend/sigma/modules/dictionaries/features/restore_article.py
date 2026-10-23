@@ -1,11 +1,9 @@
 from uuid import UUID
 
 from sigma.modules.dictionaries.domain import BudgetArticle
-from sigma.modules.dictionaries.features.errors import (
-    BudgetArticleNotFoundError,
-    CategoryNotFoundError,
-)
 from sigma.modules.dictionaries.repository import BudgetArticleRepository, CategoryRepository
+
+from .errors import BudgetArticleNotFoundError, CategoryNotFoundError
 
 
 async def restore_article(
