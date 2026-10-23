@@ -1,6 +1,7 @@
 from sigma.modules.dictionaries.domain import Category
-from sigma.modules.dictionaries.features.errors import DuplicateDictionaryNameError
 from sigma.modules.dictionaries.repository import CategoryRepository
+
+from .errors import DuplicateDictionaryNameError
 
 
 async def create_category(name: str, repository: CategoryRepository) -> Category:

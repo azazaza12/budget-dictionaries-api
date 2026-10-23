@@ -1,8 +1,9 @@
 from uuid import UUID
 
 from sigma.modules.dictionaries.domain import Category
-from sigma.modules.dictionaries.features.errors import CategoryNotFoundError
 from sigma.modules.dictionaries.repository import CategoryRepository
+
+from .errors import CategoryNotFoundError
 
 
 async def restore_category(
