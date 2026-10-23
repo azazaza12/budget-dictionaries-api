@@ -4,11 +4,8 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sigma.modules.dictionaries.domain import (
-    BudgetArticle,
-    Category,
-)
-from sigma.modules.dictionaries.models import BudgetArticleModel, CategoryModel
+from .domain import BudgetArticle, Category
+from .models import BudgetArticleModel, CategoryModel
 
 
 class CategoryRepository(Protocol):
