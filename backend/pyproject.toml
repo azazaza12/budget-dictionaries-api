@@ -105,17 +105,19 @@ name = "shared ниже модулей"
 type = "layers"
 layers = ["sigma.modules", "sigma.shared"]
 
-# presentation импортирует ТОЛЬКО facade: внутренности модуля под запретом.
-# NB: «запретить всё и разрешить список» (как у PostHog) здесь не работает —
-# при пересечении source/forbidden (родитель/потомок) контракт обнуляется,
-# поэтому внутренности перечислены явно.
+# presentation импортирует только facade — инверсия (как у PostHog): запрещено
+# всё содержимое модуля, разрешён facade; новая прослойка (utils.py) под запретом сама.
+# allow_indirect_imports нужен: иначе легальный путь presentation → facade → внутренности красный.
+# «*.*», а не «*»: корень пакета пересекается с presentation, контракт обнулился бы.
+# presentation/ — плоская: grimp не умеет «**»; появятся подпакеты — добавить выражение в ignore_imports.
 [[tool.importlinter.contracts]]
 name = "presentation импортирует только facade"
 type = "forbidden"
+allow_indirect_imports = true
+# Пока модулей нет, ignore-выражение ни с чем не матчится — warn, не падение.
+unmatched_ignore_imports_alerting = "warn"
 source_modules = ["sigma.modules.*.presentation"]
-forbidden_modules = [
-    "sigma.modules.*.models",
-    "sigma.modules.*.repository",
-    "sigma.modules.*.domain",
-    "sigma.modules.*.features",
+forbidden_modules = ["sigma.modules.*.*"]
+ignore_imports = [
+    "sigma.modules.*.presentation.* -> sigma.modules.*.facade",
 ]
