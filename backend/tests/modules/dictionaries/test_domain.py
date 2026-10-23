@@ -7,10 +7,26 @@ from sigma.modules.dictionaries.domain import (
     ArticleCategoryMismatchError,
     BudgetArticle,
     Category,
+    DictionariesDomainError,
     InvalidDictionaryNameError,
     clean_name,
     normalize_name,
 )
+
+
+@pytest.mark.parametrize(
+    ("error_type", "expected_code"),
+    [
+        (InvalidDictionaryNameError, "invalid_dictionary_name"),
+        (ArchivedCategoryError, "archived_category"),
+        (ArticleCategoryMismatchError, "article_category_mismatch"),
+    ],
+)
+def test_domain_errors_have_stable_codes(
+    error_type: type[DictionariesDomainError],
+    expected_code: str,
+) -> None:
+    assert error_type.code == expected_code
 
 
 def test_clean_name_collapses_whitespace() -> None:
@@ -63,8 +79,10 @@ def test_article_can_be_created_in_active_category() -> None:
 def test_article_cannot_be_created_in_archived_category() -> None:
     category = Category(name="Транспорт", is_archived=True)
 
-    with pytest.raises(ArchivedCategoryError):
+    with pytest.raises(ArchivedCategoryError) as error:
         BudgetArticle.create("Авиабилеты", category)
+
+    assert error.value.category_id == category.id
 
 
 def test_article_can_move_to_active_category() -> None:
@@ -114,8 +132,12 @@ def test_article_cannot_be_restored_with_another_category() -> None:
     category = Category(name="Транспорт")
     article = BudgetArticle.create("Авиабилеты", category)
     article.archive()
+    provided_category = Category(name="Командировки", id=uuid4())
 
-    with pytest.raises(ArticleCategoryMismatchError):
-        article.restore(Category(name="Командировки", id=uuid4()))
+    with pytest.raises(ArticleCategoryMismatchError) as error:
+        article.restore(provided_category)
 
     assert article.is_archived
+    assert error.value.article_id == article.id
+    assert error.value.expected_category_id == category.id
+    assert error.value.provided_category_id == provided_category.id
