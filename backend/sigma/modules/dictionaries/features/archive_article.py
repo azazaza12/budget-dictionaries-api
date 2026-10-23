@@ -1,8 +1,9 @@
 from uuid import UUID
 
 from sigma.modules.dictionaries.domain import BudgetArticle
-from sigma.modules.dictionaries.features.errors import BudgetArticleNotFoundError
 from sigma.modules.dictionaries.repository import BudgetArticleRepository
+
+from .errors import BudgetArticleNotFoundError
 
 
 async def archive_article(article_id: UUID, repository: BudgetArticleRepository) -> BudgetArticle:
