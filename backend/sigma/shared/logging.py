@@ -1,5 +1,3 @@
-"""structlog: JSON в проде (JSON_LOGS=true), цветная консоль локально."""
-
 import structlog
 
 from sigma.shared.config import settings
