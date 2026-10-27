@@ -3,6 +3,7 @@ from uuid import uuid4
 import pytest
 
 from sigma.modules.dictionaries.features.errors import (
+    BudgetArticleNotFoundError,
     CategoryNotFoundError,
     DictionariesFeatureError,
     DuplicateDictionaryNameError,
@@ -14,6 +15,7 @@ from sigma.modules.dictionaries.features.errors import (
     [
         (DuplicateDictionaryNameError, "duplicate_dictionary_name"),
         (CategoryNotFoundError, "category_not_found"),
+        (BudgetArticleNotFoundError, "budget_article_not_found"),
     ],
 )
 def test_feature_errors_have_stable_codes(
@@ -24,9 +26,9 @@ def test_feature_errors_have_stable_codes(
 
 
 def test_duplicate_name_error_exposes_name() -> None:
-    error = DuplicateDictionaryNameError("Транспорт")
+    error = DuplicateDictionaryNameError("Авиабилеты")
 
-    assert error.name == "Транспорт"
+    assert error.name == "Авиабилеты"
 
 
 def test_category_not_found_error_exposes_category_id() -> None:
@@ -35,3 +37,11 @@ def test_category_not_found_error_exposes_category_id() -> None:
     error = CategoryNotFoundError(category_id)
 
     assert error.category_id == category_id
+
+
+def test_budget_article_not_found_error_exposes_article_id() -> None:
+    article_id = uuid4()
+
+    error = BudgetArticleNotFoundError(article_id)
+
+    assert error.article_id == article_id

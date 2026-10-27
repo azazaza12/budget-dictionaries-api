@@ -20,3 +20,11 @@ class CategoryNotFoundError(DictionariesFeatureError):
     def __init__(self, category_id: UUID) -> None:
         self.category_id = category_id
         super().__init__(f"Category {category_id} was not found")
+
+
+class BudgetArticleNotFoundError(DictionariesFeatureError):
+    code = "budget_article_not_found"
+
+    def __init__(self, article_id: UUID) -> None:
+        self.article_id = article_id
+        super().__init__(f"Budget article {article_id} was not found")
