@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from sigma.modules.dictionaries.routes import register as register_dictionaries
 from sigma.shared.db import engine
 from sigma.shared.logging import configure_logging
 
@@ -21,7 +22,7 @@ def create_app() -> FastAPI:
     async def health() -> dict[str, str]:
         return {"status": "ok"}
 
-    # Роутеры модулей: app.include_router(...) — здесь
+    register_dictionaries(app)
     return app
 
 
