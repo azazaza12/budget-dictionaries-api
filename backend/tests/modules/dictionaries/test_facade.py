@@ -4,18 +4,26 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
+from asyncpg.exceptions import UniqueViolationError
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sigma.modules.dictionaries import facade as facade_module
-from sigma.modules.dictionaries.domain import BudgetArticle, Category
+from sigma.modules.dictionaries.domain import MRP, BudgetArticle, Category
 from sigma.modules.dictionaries.facade import (
     DictionariesFacade,
     DuplicateDictionaryNameError,
+    MRPNotFoundError,
 )
 from sigma.modules.dictionaries.repository import (
     SqlAlchemyBudgetArticleRepository,
     SqlAlchemyCategoryRepository,
+    SqlAlchemyMRPRepository,
 )
+
+
+class _UniqueNameViolation(UniqueViolationError):
+    constraint_name = "uq_mrp_normalized_name"
 
 
 def _session_with_transaction() -> tuple[MagicMock, MagicMock]:
@@ -50,6 +58,7 @@ def test_facade_exports_public_errors_without_domain_entities() -> None:
         "DictionariesFeatureError",
         "DuplicateDictionaryNameError",
         "InvalidDictionaryNameError",
+        "MRPNotFoundError",
     }
 
 
@@ -63,11 +72,13 @@ def test_facade_builds_repositories_with_same_session() -> None:
         patch(
             "sigma.modules.dictionaries.facade.SqlAlchemyBudgetArticleRepository"
         ) as article_repository,
+        patch("sigma.modules.dictionaries.facade.SqlAlchemyMRPRepository") as mrp_repository,
     ):
         DictionariesFacade(session)
 
     category_repository.assert_called_once_with(session)
     article_repository.assert_called_once_with(session)
+    mrp_repository.assert_called_once_with(session)
 
 
 def test_create_category_runs_feature_in_transaction() -> None:
@@ -275,3 +286,170 @@ def test_facade_propagates_feature_error_through_transaction() -> None:
     assert exit_args[0] is DuplicateDictionaryNameError
     assert exit_args[1] is error
     assert exit_args[2] is not None
+
+
+def test_create_mrp_runs_feature_in_transaction() -> None:
+    session, transaction = _session_with_transaction()
+    mrp = MRP(name="Иванов")
+    feature = AsyncMock(return_value=mrp)
+
+    with patch("sigma.modules.dictionaries.facade.create_mrp_feature", feature):
+        result = asyncio.run(DictionariesFacade(session).create_mrp("Иванов"))
+
+    assert result is mrp
+    (name, repository), _ = _awaited_call(feature)
+    assert name == "Иванов"
+    assert isinstance(repository, SqlAlchemyMRPRepository)
+    _assert_successful_transaction(session, transaction)
+
+
+def test_rename_mrp_runs_feature_in_transaction() -> None:
+    session, transaction = _session_with_transaction()
+    mrp = MRP(name="Петров")
+    feature = AsyncMock(return_value=mrp)
+
+    with patch("sigma.modules.dictionaries.facade.rename_mrp_feature", feature):
+        result = asyncio.run(DictionariesFacade(session).rename_mrp(mrp.id, "Петров"))
+
+    assert result is mrp
+    (mrp_id, new_name, repository), _ = _awaited_call(feature)
+    assert mrp_id == mrp.id
+    assert new_name == "Петров"
+    assert isinstance(repository, SqlAlchemyMRPRepository)
+    _assert_successful_transaction(session, transaction)
+
+
+def test_archive_mrp_runs_feature_in_transaction() -> None:
+    session, transaction = _session_with_transaction()
+    mrp = MRP(name="Иванов", is_archived=True)
+    feature = AsyncMock(return_value=mrp)
+
+    with patch("sigma.modules.dictionaries.facade.archive_mrp_feature", feature):
+        result = asyncio.run(DictionariesFacade(session).archive_mrp(mrp.id))
+
+    assert result is mrp
+    (mrp_id, repository), _ = _awaited_call(feature)
+    assert mrp_id == mrp.id
+    assert isinstance(repository, SqlAlchemyMRPRepository)
+    _assert_successful_transaction(session, transaction)
+
+
+def test_restore_mrp_runs_feature_in_transaction() -> None:
+    session, transaction = _session_with_transaction()
+    mrp = MRP(name="Иванов")
+    feature = AsyncMock(return_value=mrp)
+
+    with patch("sigma.modules.dictionaries.facade.restore_mrp_feature", feature):
+        result = asyncio.run(DictionariesFacade(session).restore_mrp(mrp.id))
+
+    assert result is mrp
+    (mrp_id, repository), _ = _awaited_call(feature)
+    assert mrp_id == mrp.id
+    assert isinstance(repository, SqlAlchemyMRPRepository)
+    _assert_successful_transaction(session, transaction)
+
+
+@pytest.mark.parametrize("include_archived", [False, True])
+def test_list_mrps_passes_filter_without_write_transaction(include_archived: bool) -> None:
+    session = MagicMock(spec=AsyncSession)
+    mrps = [MRP(name="Иванов")]
+    feature = AsyncMock(return_value=mrps)
+
+    with patch("sigma.modules.dictionaries.facade.list_mrps_feature", feature):
+        result = asyncio.run(
+            DictionariesFacade(session).list_mrps(include_archived=include_archived)
+        )
+
+    assert result is mrps
+    feature.assert_awaited_once()
+    (repository,), kwargs = _awaited_call(feature)
+    assert isinstance(repository, SqlAlchemyMRPRepository)
+    assert kwargs == {"include_archived": include_archived}
+    session.begin.assert_not_called()
+
+
+def test_list_mrps_excludes_archived_by_default() -> None:
+    session = MagicMock(spec=AsyncSession)
+    feature = AsyncMock(return_value=[])
+
+    with patch("sigma.modules.dictionaries.facade.list_mrps_feature", feature):
+        assert asyncio.run(DictionariesFacade(session).list_mrps()) == []
+
+    _, kwargs = _awaited_call(feature)
+    assert kwargs == {"include_archived": False}
+    session.begin.assert_not_called()
+
+
+@pytest.mark.parametrize("rename", [False, True])
+@pytest.mark.parametrize("on_commit", [False, True])
+def test_mrp_name_conflict_propagates_unchanged(rename: bool, on_commit: bool) -> None:
+    session, transaction = _session_with_transaction()
+    driver_error = _UniqueNameViolation("duplicate name")
+    adapter_error = Exception("adapter error")
+    adapter_error.__cause__ = driver_error
+    error = IntegrityError("statement", {}, adapter_error)
+    feature = AsyncMock(return_value=MRP(name="Иванов"))
+    if on_commit:
+        transaction.__aexit__.side_effect = error
+    else:
+        feature.side_effect = error
+    feature_name = "rename_mrp_feature" if rename else "create_mrp_feature"
+
+    with (
+        patch(f"sigma.modules.dictionaries.facade.{feature_name}", feature),
+        pytest.raises(IntegrityError) as caught,
+    ):
+        facade = DictionariesFacade(session)
+        if rename:
+            asyncio.run(facade.rename_mrp(uuid4(), "Иванов"))
+        else:
+            asyncio.run(facade.create_mrp("Иванов"))
+
+    assert caught.value is error
+    transaction.__aexit__.assert_awaited_once()
+
+
+@pytest.mark.parametrize("rename", [False, True])
+@pytest.mark.parametrize("cause_kind", ["other_constraint", "non_unique", "no_cause"])
+def test_mrp_writes_propagate_unrelated_integrity_errors(rename: bool, cause_kind: str) -> None:
+    session, transaction = _session_with_transaction()
+    adapter_error = Exception("adapter error")
+    if cause_kind == "other_constraint":
+        driver_error = _UniqueNameViolation("duplicate id")
+        driver_error.constraint_name = "pk_mrp"
+        adapter_error.__cause__ = driver_error
+    elif cause_kind == "non_unique":
+        adapter_error.__cause__ = ValueError("not a unique violation")
+    error = IntegrityError("statement", {}, adapter_error)
+    feature = AsyncMock(side_effect=error)
+    feature_name = "rename_mrp_feature" if rename else "create_mrp_feature"
+
+    with (
+        patch(f"sigma.modules.dictionaries.facade.{feature_name}", feature),
+        pytest.raises(IntegrityError) as caught,
+    ):
+        facade = DictionariesFacade(session)
+        if rename:
+            asyncio.run(facade.rename_mrp(uuid4(), "Иванов"))
+        else:
+            asyncio.run(facade.create_mrp("Иванов"))
+
+    assert caught.value is error
+    assert transaction.__aexit__.await_args.args[1] is error
+
+
+def test_mrp_feature_error_propagates_through_transaction() -> None:
+    session, transaction = _session_with_transaction()
+    mrp_id = uuid4()
+    error = MRPNotFoundError(mrp_id)
+    feature = AsyncMock(side_effect=error)
+
+    with (
+        patch("sigma.modules.dictionaries.facade.archive_mrp_feature", feature),
+        pytest.raises(MRPNotFoundError) as caught,
+    ):
+        asyncio.run(DictionariesFacade(session).archive_mrp(mrp_id))
+
+    assert caught.value is error
+    assert transaction.__aexit__.await_args.args[0] is MRPNotFoundError
+    assert transaction.__aexit__.await_args.args[1] is error
