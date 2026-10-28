@@ -4,8 +4,8 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .domain import BudgetArticle, Category
-from .models import BudgetArticleModel, CategoryModel
+from .domain import MRP, BudgetArticle, Category
+from .models import BudgetArticleModel, CategoryModel, MRPModel
 
 
 class CategoryRepository(Protocol):
@@ -44,6 +44,20 @@ class BudgetArticleRepository(Protocol):
     ) -> bool: ...
 
     async def save(self, budget_article: BudgetArticle) -> None: ...
+
+
+class MRPRepository(Protocol):
+    async def get(self, mrp_id: UUID) -> MRP | None: ...
+
+    async def add(self, mrp: MRP) -> None: ...
+
+    async def list(self, *, include_archived: bool = False) -> list[MRP]: ...
+
+    async def name_exists(
+        self, normalized_name: str, *, exclude_id: UUID | None = None
+    ) -> bool: ...
+
+    async def save(self, mrp: MRP) -> None: ...
 
 
 class SqlAlchemyCategoryRepository:
@@ -165,3 +179,48 @@ class SqlAlchemyBudgetArticleRepository:
     async def save(self, budget_article: BudgetArticle) -> None:
         model = self._to_model(budget_article)
         await self._session.merge(model)
+
+
+class SqlAlchemyMRPRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    @staticmethod
+    def _to_domain(model: MRPModel) -> MRP:
+        return MRP(id=model.id, name=model.name, is_archived=model.is_archived)
+
+    @staticmethod
+    def _to_model(mrp: MRP) -> MRPModel:
+        return MRPModel(
+            id=mrp.id,
+            name=mrp.name,
+            normalized_name=mrp.normalized_name,
+            is_archived=mrp.is_archived,
+        )
+
+    async def get(self, mrp_id: UUID) -> MRP | None:
+        model = await self._session.get(MRPModel, mrp_id)
+        if model is None:
+            return None
+        return self._to_domain(model)
+
+    async def add(self, mrp: MRP) -> None:
+        self._session.add(self._to_model(mrp))
+
+    async def list(self, *, include_archived: bool = False) -> list[MRP]:
+        statement = select(MRPModel)
+        if not include_archived:
+            statement = statement.where(MRPModel.is_archived.is_(False))
+        statement = statement.order_by(MRPModel.normalized_name, MRPModel.id)
+        models = (await self._session.scalars(statement)).all()
+        return [self._to_domain(model) for model in models]
+
+    async def name_exists(self, normalized_name: str, *, exclude_id: UUID | None = None) -> bool:
+        query = select(MRPModel.id).where(MRPModel.normalized_name == normalized_name)
+        if exclude_id is not None:
+            query = query.where(MRPModel.id != exclude_id)
+        statement = select(query.exists())
+        return bool(await self._session.scalar(statement))
+
+    async def save(self, mrp: MRP) -> None:
+        await self._session.merge(self._to_model(mrp))

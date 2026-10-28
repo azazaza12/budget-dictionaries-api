@@ -2,13 +2,15 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sigma.modules.dictionaries.domain import BudgetArticle, Category
-from sigma.modules.dictionaries.models import BudgetArticleModel, CategoryModel
+from sigma.modules.dictionaries.domain import MRP, BudgetArticle, Category
+from sigma.modules.dictionaries.models import BudgetArticleModel, CategoryModel, MRPModel
 from sigma.modules.dictionaries.repository import (
     SqlAlchemyBudgetArticleRepository,
     SqlAlchemyCategoryRepository,
+    SqlAlchemyMRPRepository,
 )
 
 
@@ -168,3 +170,130 @@ def test_list_articles_by_category_maps_models_to_domain() -> None:
             is_archived=False,
         )
     ]
+
+
+@pytest.mark.parametrize("is_archived", [False, True])
+def test_get_mrp_maps_model_to_domain(is_archived: bool) -> None:
+    mrp_id = uuid4()
+    session = MagicMock(spec=AsyncSession)
+    session.get = AsyncMock(
+        return_value=MRPModel(
+            id=mrp_id,
+            name="Иванов",
+            normalized_name="иванов",
+            is_archived=is_archived,
+        )
+    )
+    repository = SqlAlchemyMRPRepository(session)
+
+    mrp = asyncio.run(repository.get(mrp_id))
+
+    assert mrp == MRP(id=mrp_id, name="Иванов", is_archived=is_archived)
+    session.get.assert_awaited_once_with(MRPModel, mrp_id)
+
+
+def test_get_missing_mrp_returns_none() -> None:
+    session = MagicMock(spec=AsyncSession)
+    session.get = AsyncMock(return_value=None)
+    repository = SqlAlchemyMRPRepository(session)
+    mrp_id = uuid4()
+
+    assert asyncio.run(repository.get(mrp_id)) is None
+    session.get.assert_awaited_once_with(MRPModel, mrp_id)
+
+
+@pytest.mark.parametrize("is_archived", [False, True])
+def test_add_mrp_maps_domain_to_model(is_archived: bool) -> None:
+    session = MagicMock(spec=AsyncSession)
+    repository = SqlAlchemyMRPRepository(session)
+    mrp = MRP(name="  ИВАНОВ   Иван ", is_archived=is_archived)
+
+    asyncio.run(repository.add(mrp))
+
+    session.add.assert_called_once()
+    model = session.add.call_args.args[0]
+    assert isinstance(model, MRPModel)
+    assert model.id == mrp.id
+    assert model.name == "ИВАНОВ Иван"
+    assert model.normalized_name == "иванов иван"
+    assert model.is_archived is is_archived
+    session.commit.assert_not_called()
+
+
+@pytest.mark.parametrize("is_archived", [False, True])
+def test_save_mrp_merges_updated_model(is_archived: bool) -> None:
+    session = MagicMock(spec=AsyncSession)
+    session.merge = AsyncMock()
+    repository = SqlAlchemyMRPRepository(session)
+    mrp = MRP(name="Иванов", is_archived=is_archived)
+    mrp.rename("  ПЕТРОВ   Пётр ")
+
+    asyncio.run(repository.save(mrp))
+
+    session.merge.assert_awaited_once()
+    model = session.merge.await_args.args[0]
+    assert isinstance(model, MRPModel)
+    assert model.id == mrp.id
+    assert model.name == "ПЕТРОВ Пётр"
+    assert model.normalized_name == "петров пётр"
+    assert model.is_archived is is_archived
+    session.commit.assert_not_called()
+
+
+@pytest.mark.parametrize("include_archived", [False, True])
+def test_list_mrps_maps_models_and_filters_archived(include_archived: bool) -> None:
+    mrp_id = uuid4()
+    result = MagicMock()
+    result.all.return_value = [
+        MRPModel(
+            id=mrp_id,
+            name="Иванов",
+            normalized_name="иванов",
+            is_archived=include_archived,
+        )
+    ]
+    session = MagicMock(spec=AsyncSession)
+    session.scalars = AsyncMock(return_value=result)
+    repository = SqlAlchemyMRPRepository(session)
+
+    mrps = asyncio.run(repository.list(include_archived=include_archived))
+
+    assert mrps == [MRP(id=mrp_id, name="Иванов", is_archived=include_archived)]
+    session.scalars.assert_awaited_once()
+    sql = str(session.scalars.await_args.args[0])
+    assert ("mrp.is_archived IS false" in sql) is not include_archived
+    assert "ORDER BY mrp.normalized_name, mrp.id" in sql
+
+
+def test_list_mrps_excludes_archived_by_default() -> None:
+    result = MagicMock()
+    result.all.return_value = []
+    session = MagicMock(spec=AsyncSession)
+    session.scalars = AsyncMock(return_value=result)
+    repository = SqlAlchemyMRPRepository(session)
+
+    assert asyncio.run(repository.list()) == []
+    assert "mrp.is_archived IS false" in str(session.scalars.await_args.args[0])
+
+
+@pytest.mark.parametrize("exclude_self", [False, True])
+@pytest.mark.parametrize("exists", [False, True])
+def test_mrp_name_existence_query(exclude_self: bool, exists: bool) -> None:
+    session = MagicMock(spec=AsyncSession)
+    session.scalar = AsyncMock(return_value=exists)
+    repository = SqlAlchemyMRPRepository(session)
+    excluded_id = uuid4() if exclude_self else None
+
+    result = asyncio.run(repository.name_exists("иванов", exclude_id=excluded_id))
+
+    assert result is exists
+    session.scalar.assert_awaited_once()
+    statement = session.scalar.await_args.args[0]
+    sql = str(statement)
+    assert "EXISTS (SELECT mrp.id" in sql
+    assert "mrp.normalized_name =" in sql
+    assert "is_archived" not in sql
+    assert ("mrp.id !=" in sql) is exclude_self
+    assert "иванов" in statement.compile().params.values()
+    if excluded_id is not None:
+        assert excluded_id in statement.compile().params.values()
