@@ -28,3 +28,11 @@ class BudgetArticleNotFoundError(DictionariesFeatureError):
     def __init__(self, article_id: UUID) -> None:
         self.article_id = article_id
         super().__init__(f"Budget article {article_id} was not found")
+
+
+class MRPNotFoundError(DictionariesFeatureError):
+    code = "mrp_not_found"
+
+    def __init__(self, mrp_id: UUID) -> None:
+        self.mrp_id = mrp_id
+        super().__init__(f"MRP {mrp_id} was not found")

@@ -7,6 +7,7 @@ from sigma.modules.dictionaries.features.errors import (
     CategoryNotFoundError,
     DictionariesFeatureError,
     DuplicateDictionaryNameError,
+    MRPNotFoundError,
 )
 
 
@@ -16,6 +17,7 @@ from sigma.modules.dictionaries.features.errors import (
         (DuplicateDictionaryNameError, "duplicate_dictionary_name"),
         (CategoryNotFoundError, "category_not_found"),
         (BudgetArticleNotFoundError, "budget_article_not_found"),
+        (MRPNotFoundError, "mrp_not_found"),
     ],
 )
 def test_feature_errors_have_stable_codes(
@@ -45,3 +47,11 @@ def test_budget_article_not_found_error_exposes_article_id() -> None:
     error = BudgetArticleNotFoundError(article_id)
 
     assert error.article_id == article_id
+
+
+def test_mrp_not_found_error_exposes_mrp_id() -> None:
+    mrp_id = uuid4()
+
+    error = MRPNotFoundError(mrp_id)
+
+    assert error.mrp_id == mrp_id
