@@ -28,3 +28,14 @@ class BudgetArticleModel(Base):
         Boolean, nullable=False, default=False, server_default=false()
     )
     normalized_name: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+
+
+class CFOModel(Base):
+    __tablename__ = "cfo"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    is_archived: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    normalized_name: Mapped[str] = mapped_column(Text, nullable=False, unique=True)

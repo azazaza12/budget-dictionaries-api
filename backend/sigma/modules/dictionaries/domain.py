@@ -100,3 +100,9 @@ class BudgetArticle(BaseDictionary):
     def move_to(self, target_category: Category) -> None:
         target_category.require_active()
         self.category_id = target_category.id
+
+
+@dataclass(slots=True, kw_only=True)
+class CFO(BaseDictionary):
+    def restore(self) -> None:
+        self.is_archived = False

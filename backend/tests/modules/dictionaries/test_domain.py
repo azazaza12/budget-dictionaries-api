@@ -3,6 +3,7 @@ from uuid import uuid4
 import pytest
 
 from sigma.modules.dictionaries.domain import (
+    CFO,
     ArchivedCategoryError,
     ArticleCategoryMismatchError,
     BudgetArticle,
@@ -12,6 +13,24 @@ from sigma.modules.dictionaries.domain import (
     clean_name,
     normalize_name,
 )
+
+
+def test_cfo_can_be_renamed_archived_and_restored() -> None:
+    cfo = CFO(name="  Отдел   закупок ")
+
+    assert cfo.name == "Отдел закупок"
+    assert cfo.normalized_name == "отдел закупок"
+
+    cfo.rename("  Отдел   снабжения ")
+    cfo.archive()
+
+    assert cfo.name == "Отдел снабжения"
+    assert cfo.normalized_name == "отдел снабжения"
+    assert cfo.is_archived
+
+    cfo.restore()
+
+    assert not cfo.is_archived
 
 
 @pytest.mark.parametrize(

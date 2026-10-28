@@ -4,8 +4,8 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .domain import BudgetArticle, Category
-from .models import BudgetArticleModel, CategoryModel
+from .domain import CFO, BudgetArticle, Category
+from .models import BudgetArticleModel, CategoryModel, CFOModel
 
 
 class CategoryRepository(Protocol):
@@ -44,6 +44,20 @@ class BudgetArticleRepository(Protocol):
     ) -> bool: ...
 
     async def save(self, budget_article: BudgetArticle) -> None: ...
+
+
+class CFORepository(Protocol):
+    async def get(self, cfo_id: UUID) -> CFO | None: ...
+
+    async def add(self, cfo: CFO) -> None: ...
+
+    async def list(self, *, include_archived: bool = False) -> list[CFO]: ...
+
+    async def save(self, cfo: CFO) -> None: ...
+
+    async def name_exists(
+        self, normalized_name: str, *, exclude_id: UUID | None = None
+    ) -> bool: ...
 
 
 class SqlAlchemyCategoryRepository:
@@ -165,3 +179,50 @@ class SqlAlchemyBudgetArticleRepository:
     async def save(self, budget_article: BudgetArticle) -> None:
         model = self._to_model(budget_article)
         await self._session.merge(model)
+
+
+class SqlAlchemyCFORepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    @staticmethod
+    def _to_domain(model: CFOModel) -> CFO:
+        return CFO(id=model.id, name=model.name, is_archived=model.is_archived)
+
+    @staticmethod
+    def _to_model(cfo: CFO) -> CFOModel:
+        return CFOModel(
+            id=cfo.id,
+            name=cfo.name,
+            normalized_name=cfo.normalized_name,
+            is_archived=cfo.is_archived,
+        )
+
+    async def get(self, cfo_id: UUID) -> CFO | None:
+        model = await self._session.get(CFOModel, cfo_id)
+        if model is None:
+            return None
+        return self._to_domain(model)
+
+    async def add(self, cfo: CFO) -> None:
+        cfo_model = self._to_model(cfo)
+        self._session.add(cfo_model)
+
+    async def list(self, *, include_archived: bool = False) -> list[CFO]:
+        statement = select(CFOModel)
+        if not include_archived:
+            statement = statement.where(CFOModel.is_archived.is_(False))
+        statement = statement.order_by(CFOModel.normalized_name, CFOModel.id)
+        models = (await self._session.scalars(statement)).all()
+        return [self._to_domain(model) for model in models]
+
+    async def save(self, cfo: CFO) -> None:
+        model = self._to_model(cfo)
+        await self._session.merge(model)
+
+    async def name_exists(self, normalized_name: str, *, exclude_id: UUID | None = None) -> bool:
+        query = select(CFOModel.id).where(CFOModel.normalized_name == normalized_name)
+        if exclude_id is not None:
+            query = query.where(CFOModel.id != exclude_id)
+        statement = select(query.exists())
+        return bool(await self._session.scalar(statement))
