@@ -1,7 +1,5 @@
 from uuid import UUID
 
-from asyncpg.exceptions import UniqueViolationError
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .domain import (
@@ -54,15 +52,6 @@ __all__ = (
     "DuplicateDictionaryNameError",
     "InvalidDictionaryNameError",
 )
-
-
-def _is_duplicate_cfo_name(error: IntegrityError) -> bool:
-    # SQLAlchemy's asyncpg adapter preserves the driver error as its cause.
-    cause = error.orig.__cause__ if error.orig is not None else None
-    return (
-        isinstance(cause, UniqueViolationError)
-        and getattr(cause, "constraint_name", None) == "uq_cfo_normalized_name"
-    )
 
 
 class DictionariesFacade:
@@ -151,22 +140,12 @@ class DictionariesFacade:
         )
 
     async def create_cfo(self, name: str) -> CFO:
-        try:
-            async with self._session.begin():
-                return await create_cfo_feature(name, self._cfo_repository)
-        except IntegrityError as error:
-            if _is_duplicate_cfo_name(error):
-                raise DuplicateDictionaryNameError(name) from error
-            raise
+        async with self._session.begin():
+            return await create_cfo_feature(name, self._cfo_repository)
 
     async def rename_cfo(self, cfo_id: UUID, new_name: str) -> CFO:
-        try:
-            async with self._session.begin():
-                return await rename_cfo_feature(cfo_id, new_name, self._cfo_repository)
-        except IntegrityError as error:
-            if _is_duplicate_cfo_name(error):
-                raise DuplicateDictionaryNameError(new_name) from error
-            raise
+        async with self._session.begin():
+            return await rename_cfo_feature(cfo_id, new_name, self._cfo_repository)
 
     async def archive_cfo(self, cfo_id: UUID) -> CFO:
         async with self._session.begin():

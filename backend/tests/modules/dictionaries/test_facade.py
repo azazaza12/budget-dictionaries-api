@@ -364,9 +364,7 @@ def test_list_cfos_passes_filter_without_write_transaction(include_archived: boo
 
 @pytest.mark.parametrize("rename", [False, True])
 @pytest.mark.parametrize("at_commit", [False, True])
-def test_cfo_name_conflict_is_translated_after_transaction_exit(
-    rename: bool, at_commit: bool
-) -> None:
+def test_cfo_name_conflict_propagates_unchanged(rename: bool, at_commit: bool) -> None:
     session, transaction = _session_with_transaction()
     violation = _UniqueViolation("duplicate name")
     original = Exception("adapted asyncpg error")
@@ -382,15 +380,14 @@ def test_cfo_name_conflict_is_translated_after_transaction_exit(
 
     with (
         patch(f"sigma.modules.dictionaries.facade.{feature_name}", feature),
-        pytest.raises(DuplicateDictionaryNameError, match="Закупки") as caught,
+        pytest.raises(IntegrityError) as caught,
     ):
         facade = DictionariesFacade(session)
         asyncio.run(
             facade.rename_cfo(cfo.id, "Закупки") if rename else facade.create_cfo("Закупки")
         )
 
-    assert caught.value.__cause__ is error
-    assert caught.value.name == "Закупки"
+    assert caught.value is error
     transaction.__aexit__.assert_awaited_once()
     exit_args = transaction.__aexit__.await_args.args
     if at_commit:
