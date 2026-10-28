@@ -7,6 +7,7 @@ from sigma.modules.dictionaries.facade import (
     ArticleCategoryMismatchError,
     BudgetArticleNotFoundError,
     CategoryNotFoundError,
+    CFONotFoundError,
     DictionariesDomainError,
     DictionariesFeatureError,
     DuplicateDictionaryNameError,
@@ -14,6 +15,7 @@ from sigma.modules.dictionaries.facade import (
 )
 
 ERROR_STATUSES: dict[type[Exception], int] = {
+    CFONotFoundError: status.HTTP_404_NOT_FOUND,
     CategoryNotFoundError: status.HTTP_404_NOT_FOUND,
     BudgetArticleNotFoundError: status.HTTP_404_NOT_FOUND,
     DuplicateDictionaryNameError: status.HTTP_409_CONFLICT,

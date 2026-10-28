@@ -3,6 +3,20 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
 
+class CFOInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+
+
+class CFOView(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    is_archived: bool
+
+
 class CategoryInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

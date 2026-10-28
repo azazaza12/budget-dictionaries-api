@@ -9,6 +9,7 @@ from sigma.modules.dictionaries.facade import (
     ArticleCategoryMismatchError,
     BudgetArticleNotFoundError,
     CategoryNotFoundError,
+    CFONotFoundError,
     DictionariesDomainError,
     DictionariesFeatureError,
     DuplicateDictionaryNameError,
@@ -20,11 +21,13 @@ ARTICLE_ID = uuid4()
 CATEGORY_ID = uuid4()
 EXPECTED_CATEGORY_ID = uuid4()
 PROVIDED_CATEGORY_ID = uuid4()
+CFO_ID = uuid4()
 
 
 @pytest.mark.parametrize(
     ("error", "expected_status", "expected_code", "expected_context"),
     [
+        (CFONotFoundError(CFO_ID), 404, "cfo_not_found", {"cfo_id": str(CFO_ID)}),
         (
             CategoryNotFoundError(CATEGORY_ID),
             404,
