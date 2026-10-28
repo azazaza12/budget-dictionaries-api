@@ -3,6 +3,7 @@ from uuid import uuid4
 import pytest
 
 from sigma.modules.dictionaries.domain import (
+    MRP,
     ArchivedCategoryError,
     ArticleCategoryMismatchError,
     BudgetArticle,
@@ -141,3 +142,68 @@ def test_article_cannot_be_restored_with_another_category() -> None:
     assert error.value.article_id == article.id
     assert error.value.expected_category_id == category.id
     assert error.value.provided_category_id == provided_category.id
+
+
+def test_mrp_cleans_name_and_exposes_normalized_name() -> None:
+    mrp = MRP(name="  Иванов   ИВАН\tИванович ")
+
+    assert mrp.name == "Иванов ИВАН Иванович"
+    assert mrp.normalized_name == "иванов иван иванович"
+    assert not mrp.is_archived
+
+
+def test_mrp_generates_independent_ids() -> None:
+    first = MRP(name="Иванов")
+    second = MRP(name="Петров")
+
+    assert first.id != second.id
+
+
+def test_mrp_preserves_provided_id_and_archive_state() -> None:
+    mrp_id = uuid4()
+
+    mrp = MRP(id=mrp_id, name="Иванов", is_archived=True)
+
+    assert mrp.id == mrp_id
+    assert mrp.is_archived
+
+
+def test_mrp_can_be_renamed() -> None:
+    mrp = MRP(name="Иванов")
+
+    mrp.rename("  ПЕТРОВ   Пётр ")
+
+    assert mrp.name == "ПЕТРОВ Пётр"
+    assert mrp.normalized_name == "петров пётр"
+
+
+@pytest.mark.parametrize("name", ["", " \t\n "])
+def test_mrp_rejects_empty_name(name: str) -> None:
+    with pytest.raises(InvalidDictionaryNameError):
+        MRP(name=name)
+
+
+def test_mrp_rejects_empty_rename_without_mutation() -> None:
+    mrp = MRP(name="Иванов")
+
+    with pytest.raises(InvalidDictionaryNameError):
+        mrp.rename(" \t ")
+
+    assert mrp.name == "Иванов"
+
+
+def test_mrp_archive_and_restore_are_idempotent() -> None:
+    mrp = MRP(name="Иванов")
+    original_id = mrp.id
+
+    mrp.archive()
+    mrp.archive()
+
+    assert mrp.is_archived
+
+    mrp.restore()
+    mrp.restore()
+
+    assert not mrp.is_archived
+    assert mrp.id == original_id
+    assert mrp.name == "Иванов"

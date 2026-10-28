@@ -17,6 +17,17 @@ class CategoryModel(Base):
     normalized_name: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
 
 
+class MRPModel(Base):
+    __tablename__ = "mrp"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    is_archived: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    normalized_name: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+
+
 class BudgetArticleModel(Base):
     __tablename__ = "budget_articles"
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
