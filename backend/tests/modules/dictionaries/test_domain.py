@@ -5,12 +5,16 @@ import pytest
 from sigma.modules.dictionaries.domain import (
     CFO,
     MRP,
+    ArchivedBudgetArticleError,
     ArchivedCategoryError,
+    ArchivedCFOError,
+    ArchivedMRPError,
     ArticleCategoryMismatchError,
     BudgetArticle,
     Category,
     DictionariesDomainError,
     InvalidDictionaryNameError,
+    SavingsDistributionRule,
     clean_name,
     normalize_name,
 )
@@ -39,6 +43,9 @@ def test_cfo_can_be_renamed_archived_and_restored() -> None:
     [
         (InvalidDictionaryNameError, "invalid_dictionary_name"),
         (ArchivedCategoryError, "archived_category"),
+        (ArchivedCFOError, "archived_cfo"),
+        (ArchivedBudgetArticleError, "archived_budget_article"),
+        (ArchivedMRPError, "archived_mrp"),
         (ArticleCategoryMismatchError, "article_category_mismatch"),
     ],
 )
@@ -47,6 +54,141 @@ def test_domain_errors_have_stable_codes(
     expected_code: str,
 ) -> None:
     assert error_type.code == expected_code
+
+
+@pytest.fixture
+def rule_references() -> tuple[CFO, BudgetArticle, MRP]:
+    return (
+        CFO(name="Закупки"),
+        BudgetArticle(name="Билеты", category_id=uuid4()),
+        MRP(name="Иванов"),
+    )
+
+
+def test_rule_can_be_created(rule_references: tuple[CFO, BudgetArticle, MRP]) -> None:
+    cfo, article, mrp = rule_references
+
+    rule = SavingsDistributionRule.create(cfo, article, mrp)
+
+    assert rule.cfo_id == cfo.id
+    assert rule.budget_article_id == article.id
+    assert rule.mrp_id == mrp.id
+
+
+def test_rules_generate_independent_ids(rule_references: tuple[CFO, BudgetArticle, MRP]) -> None:
+    first = SavingsDistributionRule.create(*rule_references)
+    second = SavingsDistributionRule.create(*rule_references)
+
+    assert first.id != second.id
+
+
+def test_rule_preserves_provided_id() -> None:
+    rule_id = uuid4()
+
+    rule = SavingsDistributionRule(
+        id=rule_id, cfo_id=uuid4(), budget_article_id=uuid4(), mrp_id=uuid4()
+    )
+
+    assert rule.id == rule_id
+
+
+def test_rule_can_be_updated_without_changing_id(
+    rule_references: tuple[CFO, BudgetArticle, MRP],
+) -> None:
+    rule = SavingsDistributionRule(cfo_id=uuid4(), budget_article_id=uuid4(), mrp_id=uuid4())
+    original_id = rule.id
+    cfo, article, mrp = rule_references
+
+    rule.update(cfo, article, mrp)
+
+    assert rule.cfo_id == cfo.id
+    assert rule.budget_article_id == article.id
+    assert rule.mrp_id == mrp.id
+    assert rule.id == original_id
+
+
+@pytest.mark.parametrize(
+    ("reference_index", "error_type"),
+    [(0, ArchivedCFOError), (1, ArchivedBudgetArticleError), (2, ArchivedMRPError)],
+)
+def test_rule_rejects_archived_reference_on_creation(
+    rule_references: tuple[CFO, BudgetArticle, MRP],
+    reference_index: int,
+    error_type: type[DictionariesDomainError],
+) -> None:
+    reference = rule_references[reference_index]
+    reference.archive()
+
+    with pytest.raises(error_type) as error:
+        SavingsDistributionRule.create(*rule_references)
+
+    assert str(reference.id) in str(error.value)
+
+
+@pytest.mark.parametrize(
+    ("reference_index", "error_type"),
+    [(0, ArchivedCFOError), (1, ArchivedBudgetArticleError), (2, ArchivedMRPError)],
+)
+def test_rule_rejects_archived_replacement_without_mutation(
+    rule_references: tuple[CFO, BudgetArticle, MRP],
+    reference_index: int,
+    error_type: type[DictionariesDomainError],
+) -> None:
+    rule = SavingsDistributionRule(cfo_id=uuid4(), budget_article_id=uuid4(), mrp_id=uuid4())
+    original_ids = (rule.cfo_id, rule.budget_article_id, rule.mrp_id)
+    rule_references[reference_index].archive()
+
+    with pytest.raises(error_type):
+        rule.update(*rule_references)
+
+    assert (rule.cfo_id, rule.budget_article_id, rule.mrp_id) == original_ids
+
+
+@pytest.mark.parametrize("replacement_index", [0, 1, 2])
+def test_rule_can_replace_reference_while_retaining_other_archived_references(
+    rule_references: tuple[CFO, BudgetArticle, MRP], replacement_index: int
+) -> None:
+    cfo, article, mrp = rule_references
+    rule = SavingsDistributionRule.create(cfo, article, mrp)
+    for reference in rule_references:
+        reference.archive()
+    new_cfo = CFO(name="Снабжение") if replacement_index == 0 else cfo
+    new_article = (
+        BudgetArticle(name="Проживание", category_id=uuid4()) if replacement_index == 1 else article
+    )
+    new_mrp = MRP(name="Петров") if replacement_index == 2 else mrp
+
+    rule.update(new_cfo, new_article, new_mrp)
+
+    assert (rule.cfo_id, rule.budget_article_id, rule.mrp_id) == (
+        new_cfo.id,
+        new_article.id,
+        new_mrp.id,
+    )
+
+
+def test_rule_can_retain_all_archived_references(
+    rule_references: tuple[CFO, BudgetArticle, MRP],
+) -> None:
+    rule = SavingsDistributionRule.create(*rule_references)
+    for reference in rule_references:
+        reference.archive()
+
+    rule.update(*rule_references)
+
+    cfo, article, mrp = rule_references
+    assert (rule.cfo_id, rule.budget_article_id, rule.mrp_id) == (cfo.id, article.id, mrp.id)
+
+
+def test_article_category_change_does_not_change_rule(
+    rule_references: tuple[CFO, BudgetArticle, MRP],
+) -> None:
+    cfo, article, mrp = rule_references
+    rule = SavingsDistributionRule.create(cfo, article, mrp)
+
+    article.move_to(Category(name="Командировки"))
+
+    assert (rule.cfo_id, rule.budget_article_id, rule.mrp_id) == (cfo.id, article.id, mrp.id)
 
 
 def test_clean_name_collapses_whitespace() -> None:

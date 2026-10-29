@@ -19,6 +19,30 @@ class ArchivedCategoryError(DictionariesDomainError):
         super().__init__(f"Category {category_id} is archived")
 
 
+class ArchivedCFOError(DictionariesDomainError):
+    code = "archived_cfo"
+
+    def __init__(self, cfo_id: UUID) -> None:
+        self.cfo_id = cfo_id
+        super().__init__(f"CFO {cfo_id} is archived")
+
+
+class ArchivedBudgetArticleError(DictionariesDomainError):
+    code = "archived_budget_article"
+
+    def __init__(self, article_id: UUID) -> None:
+        self.article_id = article_id
+        super().__init__(f"Budget article {article_id} is archived")
+
+
+class ArchivedMRPError(DictionariesDomainError):
+    code = "archived_mrp"
+
+    def __init__(self, mrp_id: UUID) -> None:
+        self.mrp_id = mrp_id
+        super().__init__(f"MRP {mrp_id} is archived")
+
+
 class ArticleCategoryMismatchError(DictionariesDomainError):
     code = "article_category_mismatch"
 
@@ -82,6 +106,10 @@ class Category(BaseDictionary):
 class BudgetArticle(BaseDictionary):
     category_id: UUID
 
+    def require_active(self) -> None:
+        if self.is_archived:
+            raise ArchivedBudgetArticleError(self.id)
+
     @classmethod
     def create(cls, name: str, category: Category) -> BudgetArticle:
         category.require_active()
@@ -107,8 +135,42 @@ class MRP(BaseDictionary):
     def restore(self) -> None:
         self.is_archived = False
 
+    def require_active(self) -> None:
+        if self.is_archived:
+            raise ArchivedMRPError(self.id)
+
 
 @dataclass(slots=True, kw_only=True)
 class CFO(BaseDictionary):
     def restore(self) -> None:
         self.is_archived = False
+
+    def require_active(self) -> None:
+        if self.is_archived:
+            raise ArchivedCFOError(self.id)
+
+
+@dataclass(kw_only=True, slots=True)
+class SavingsDistributionRule:
+    id: UUID = field(default_factory=uuid4)
+    cfo_id: UUID
+    budget_article_id: UUID
+    mrp_id: UUID
+
+    @classmethod
+    def create(cls, cfo: CFO, budget_article: BudgetArticle, mrp: MRP) -> SavingsDistributionRule:
+        cfo.require_active()
+        budget_article.require_active()
+        mrp.require_active()
+        return cls(cfo_id=cfo.id, budget_article_id=budget_article.id, mrp_id=mrp.id)
+
+    def update(self, cfo: CFO, budget_article: BudgetArticle, mrp: MRP) -> None:
+        if cfo.id != self.cfo_id:
+            cfo.require_active()
+        if budget_article.id != self.budget_article_id:
+            budget_article.require_active()
+        if mrp.id != self.mrp_id:
+            mrp.require_active()
+        self.cfo_id = cfo.id
+        self.budget_article_id = budget_article.id
+        self.mrp_id = mrp.id
