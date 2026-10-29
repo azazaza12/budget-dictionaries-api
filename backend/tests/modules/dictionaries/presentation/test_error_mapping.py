@@ -13,6 +13,7 @@ from sigma.modules.dictionaries.facade import (
     DictionariesFeatureError,
     DuplicateDictionaryNameError,
     InvalidDictionaryNameError,
+    MRPNotFoundError,
 )
 from sigma.modules.dictionaries.presentation.error_mapping import dictionaries_error
 
@@ -20,11 +21,18 @@ ARTICLE_ID = uuid4()
 CATEGORY_ID = uuid4()
 EXPECTED_CATEGORY_ID = uuid4()
 PROVIDED_CATEGORY_ID = uuid4()
+MRP_ID = uuid4()
 
 
 @pytest.mark.parametrize(
     ("error", "expected_status", "expected_code", "expected_context"),
     [
+        (
+            MRPNotFoundError(MRP_ID),
+            404,
+            "mrp_not_found",
+            {"mrp_id": str(MRP_ID)},
+        ),
         (
             CategoryNotFoundError(CATEGORY_ID),
             404,

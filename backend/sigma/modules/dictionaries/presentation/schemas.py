@@ -3,6 +3,20 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
 
+class MRPInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+
+
+class MRPView(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    is_archived: bool
+
+
 class CategoryInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

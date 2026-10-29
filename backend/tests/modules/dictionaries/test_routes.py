@@ -47,12 +47,16 @@ def test_application_exposes_all_dictionary_routes(dictionaries_api: Dictionarie
         "/dictionaries/articles/{article_id}/category": {"put"},
         "/dictionaries/articles/{article_id}/archive": {"post"},
         "/dictionaries/articles/{article_id}/restore": {"post"},
+        "/dictionaries/mrps": {"get", "post"},
+        "/dictionaries/mrps/{mrp_id}": {"put"},
+        "/dictionaries/mrps/{mrp_id}/archive": {"post"},
+        "/dictionaries/mrps/{mrp_id}/restore": {"post"},
     }
     for path, methods in expected_routes.items():
         assert set(paths[path]) == methods
 
 
-@pytest.mark.parametrize("resource", ["categories", "articles"])
+@pytest.mark.parametrize("resource", ["categories", "articles", "mrps"])
 def test_application_serves_dictionary_lists(
     resource: str,
     dictionaries_api: DictionariesApi,

@@ -11,9 +11,11 @@ from sigma.modules.dictionaries.facade import (
     DictionariesFeatureError,
     DuplicateDictionaryNameError,
     InvalidDictionaryNameError,
+    MRPNotFoundError,
 )
 
 ERROR_STATUSES: dict[type[Exception], int] = {
+    MRPNotFoundError: status.HTTP_404_NOT_FOUND,
     CategoryNotFoundError: status.HTTP_404_NOT_FOUND,
     BudgetArticleNotFoundError: status.HTTP_404_NOT_FOUND,
     DuplicateDictionaryNameError: status.HTTP_409_CONFLICT,

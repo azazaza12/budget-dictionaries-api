@@ -11,6 +11,8 @@ from sigma.modules.dictionaries.presentation.schemas import (
     BudgetArticleView,
     CategoryInput,
     CategoryView,
+    MRPInput,
+    MRPView,
 )
 
 
@@ -49,6 +51,7 @@ def test_budget_article_category_input_parses_category_id() -> None:
     ("schema", "data"),
     [
         (CategoryInput, {"name": "Транспорт"}),
+        (MRPInput, {"name": "Иванов"}),
         (BudgetArticleInput, {"name": "Авиабилеты", "category_id": uuid4()}),
         (BudgetArticleNameInput, {"name": "Авиабилеты"}),
         (BudgetArticleCategoryInput, {"category_id": uuid4()}),
@@ -110,3 +113,18 @@ def test_category_view_validates_list_items() -> None:
     views = TypeAdapter(list[CategoryView]).validate_python(categories)
 
     assert [view.name for view in views] == ["Транспорт", "Командировки"]
+
+
+def test_mrp_input_accepts_name() -> None:
+    assert MRPInput(name="Иванов").name == "Иванов"
+
+
+def test_mrp_view_reads_attributes_without_exposing_normalized_name() -> None:
+    mrp_id = uuid4()
+    mrp = SimpleNamespace(id=mrp_id, name="Иванов", is_archived=True, normalized_name="иванов")
+
+    assert MRPView.model_validate(mrp).model_dump(mode="json") == {
+        "id": str(mrp_id),
+        "name": "Иванов",
+        "is_archived": True,
+    }
