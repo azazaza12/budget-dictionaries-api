@@ -106,3 +106,9 @@ class BudgetArticle(BaseDictionary):
 class MRP(BaseDictionary):
     def restore(self) -> None:
         self.is_archived = False
+
+
+@dataclass(slots=True, kw_only=True)
+class CFO(BaseDictionary):
+    def restore(self) -> None:
+        self.is_archived = False

@@ -4,12 +4,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
-from asyncpg.exceptions import UniqueViolationError
+from asyncpg.exceptions import NotNullViolationError, UniqueViolationError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sigma.modules.dictionaries import facade as facade_module
-from sigma.modules.dictionaries.domain import MRP, BudgetArticle, Category
+from sigma.modules.dictionaries.domain import CFO, MRP, BudgetArticle, Category
 from sigma.modules.dictionaries.facade import (
     DictionariesFacade,
     DuplicateDictionaryNameError,
@@ -18,12 +18,25 @@ from sigma.modules.dictionaries.facade import (
 from sigma.modules.dictionaries.repository import (
     SqlAlchemyBudgetArticleRepository,
     SqlAlchemyCategoryRepository,
+    SqlAlchemyCFORepository,
     SqlAlchemyMRPRepository,
 )
 
 
 class _UniqueNameViolation(UniqueViolationError):
     constraint_name = "uq_mrp_normalized_name"
+
+
+class _UniqueViolation(UniqueViolationError):
+    constraint_name = "uq_cfo_normalized_name"
+
+
+class _PrimaryKeyViolation(UniqueViolationError):
+    constraint_name = "pk_cfo"
+
+
+class _NotNullViolation(NotNullViolationError):
+    constraint_name = "uq_cfo_normalized_name"
 
 
 def _session_with_transaction() -> tuple[MagicMock, MagicMock]:
@@ -53,6 +66,7 @@ def test_facade_exports_public_errors_without_domain_entities() -> None:
         "ArticleCategoryMismatchError",
         "BudgetArticleNotFoundError",
         "CategoryNotFoundError",
+        "CFONotFoundError",
         "DictionariesDomainError",
         "DictionariesFacade",
         "DictionariesFeatureError",
@@ -73,12 +87,14 @@ def test_facade_builds_repositories_with_same_session() -> None:
             "sigma.modules.dictionaries.facade.SqlAlchemyBudgetArticleRepository"
         ) as article_repository,
         patch("sigma.modules.dictionaries.facade.SqlAlchemyMRPRepository") as mrp_repository,
+        patch("sigma.modules.dictionaries.facade.SqlAlchemyCFORepository") as cfo_repository,
     ):
         DictionariesFacade(session)
 
     category_repository.assert_called_once_with(session)
     article_repository.assert_called_once_with(session)
     mrp_repository.assert_called_once_with(session)
+    cfo_repository.assert_called_once_with(session)
 
 
 def test_create_category_runs_feature_in_transaction() -> None:
@@ -349,6 +365,55 @@ def test_restore_mrp_runs_feature_in_transaction() -> None:
     _assert_successful_transaction(session, transaction)
 
 
+def test_create_cfo_runs_feature_in_transaction() -> None:
+    session, transaction = _session_with_transaction()
+    cfo = CFO(name="Закупки")
+    feature = AsyncMock(return_value=cfo)
+
+    with patch("sigma.modules.dictionaries.facade.create_cfo_feature", feature):
+        result = asyncio.run(DictionariesFacade(session).create_cfo("Закупки"))
+
+    assert result is cfo
+    (name, repository), _ = _awaited_call(feature)
+    assert name == "Закупки"
+    assert isinstance(repository, SqlAlchemyCFORepository)
+    _assert_successful_transaction(session, transaction)
+
+
+def test_rename_cfo_runs_feature_in_transaction() -> None:
+    session, transaction = _session_with_transaction()
+    cfo = CFO(name="Снабжение")
+    feature = AsyncMock(return_value=cfo)
+
+    with patch("sigma.modules.dictionaries.facade.rename_cfo_feature", feature):
+        result = asyncio.run(DictionariesFacade(session).rename_cfo(cfo.id, "Снабжение"))
+
+    assert result is cfo
+    (cfo_id, name, repository), _ = _awaited_call(feature)
+    assert cfo_id == cfo.id
+    assert name == "Снабжение"
+    assert isinstance(repository, SqlAlchemyCFORepository)
+    _assert_successful_transaction(session, transaction)
+
+
+@pytest.mark.parametrize("restore", [False, True])
+def test_cfo_archive_and_restore_run_in_transaction(restore: bool) -> None:
+    session, transaction = _session_with_transaction()
+    cfo = CFO(name="Закупки", is_archived=not restore)
+    feature = AsyncMock(return_value=cfo)
+    feature_name = "restore_cfo_feature" if restore else "archive_cfo_feature"
+
+    with patch(f"sigma.modules.dictionaries.facade.{feature_name}", feature):
+        facade = DictionariesFacade(session)
+        result = asyncio.run(facade.restore_cfo(cfo.id) if restore else facade.archive_cfo(cfo.id))
+
+    assert result is cfo
+    (cfo_id, repository), _ = _awaited_call(feature)
+    assert cfo_id == cfo.id
+    assert isinstance(repository, SqlAlchemyCFORepository)
+    _assert_successful_transaction(session, transaction)
+
+
 @pytest.mark.parametrize("include_archived", [False, True])
 def test_list_mrps_passes_filter_without_write_transaction(include_archived: bool) -> None:
     session = MagicMock(spec=AsyncSession)
@@ -364,6 +429,24 @@ def test_list_mrps_passes_filter_without_write_transaction(include_archived: boo
     feature.assert_awaited_once()
     (repository,), kwargs = _awaited_call(feature)
     assert isinstance(repository, SqlAlchemyMRPRepository)
+    assert kwargs == {"include_archived": include_archived}
+    session.begin.assert_not_called()
+
+
+@pytest.mark.parametrize("include_archived", [False, True])
+def test_list_cfos_passes_filter_without_write_transaction(include_archived: bool) -> None:
+    session = MagicMock(spec=AsyncSession)
+    cfos = [CFO(name="Закупки")]
+    feature = AsyncMock(return_value=cfos)
+
+    with patch("sigma.modules.dictionaries.facade.list_cfos_feature", feature):
+        result = asyncio.run(
+            DictionariesFacade(session).list_cfos(include_archived=include_archived)
+        )
+
+    assert result is cfos
+    (repository,), kwargs = _awaited_call(feature)
+    assert isinstance(repository, SqlAlchemyCFORepository)
     assert kwargs == {"include_archived": include_archived}
     session.begin.assert_not_called()
 
@@ -404,6 +487,75 @@ def test_mrp_name_conflict_propagates_unchanged(rename: bool, on_commit: bool) -
             asyncio.run(facade.rename_mrp(uuid4(), "Иванов"))
         else:
             asyncio.run(facade.create_mrp("Иванов"))
+
+    assert caught.value is error
+    transaction.__aexit__.assert_awaited_once()
+
+
+@pytest.mark.parametrize("rename", [False, True])
+@pytest.mark.parametrize("at_commit", [False, True])
+def test_cfo_name_conflict_propagates_unchanged(rename: bool, at_commit: bool) -> None:
+    session, transaction = _session_with_transaction()
+    violation = _UniqueViolation("duplicate name")
+    original = Exception("adapted asyncpg error")
+    original.__cause__ = violation
+    error = IntegrityError("statement", {}, original)
+    cfo = CFO(name="Закупки")
+    feature = AsyncMock(return_value=cfo)
+    if at_commit:
+        transaction.__aexit__.side_effect = error
+    else:
+        feature.side_effect = error
+    feature_name = "rename_cfo_feature" if rename else "create_cfo_feature"
+
+    with (
+        patch(f"sigma.modules.dictionaries.facade.{feature_name}", feature),
+        pytest.raises(IntegrityError) as caught,
+    ):
+        facade = DictionariesFacade(session)
+        asyncio.run(
+            facade.rename_cfo(cfo.id, "Закупки") if rename else facade.create_cfo("Закупки")
+        )
+
+    assert caught.value is error
+    transaction.__aexit__.assert_awaited_once()
+    exit_args = transaction.__aexit__.await_args.args
+    if at_commit:
+        assert exit_args == (None, None, None)
+    else:
+        assert exit_args[0] is IntegrityError
+        assert exit_args[1] is error
+
+
+@pytest.mark.parametrize("rename", [False, True])
+@pytest.mark.parametrize(
+    "driver_error_type",
+    [
+        _PrimaryKeyViolation,
+        _NotNullViolation,
+        Exception,
+    ],
+)
+def test_cfo_preserves_unrelated_integrity_errors(
+    rename: bool,
+    driver_error_type: type[Exception],
+) -> None:
+    session, transaction = _session_with_transaction()
+    driver_error = driver_error_type("unrelated error")
+    original = Exception("adapted asyncpg error")
+    original.__cause__ = driver_error
+    error = IntegrityError("statement", {}, original)
+    feature = AsyncMock(side_effect=error)
+    feature_name = "rename_cfo_feature" if rename else "create_cfo_feature"
+
+    with (
+        patch(f"sigma.modules.dictionaries.facade.{feature_name}", feature),
+        pytest.raises(IntegrityError) as caught,
+    ):
+        facade = DictionariesFacade(session)
+        asyncio.run(
+            facade.rename_cfo(uuid4(), "Закупки") if rename else facade.create_cfo("Закупки")
+        )
 
     assert caught.value is error
     transaction.__aexit__.assert_awaited_once()
@@ -453,3 +605,20 @@ def test_mrp_feature_error_propagates_through_transaction() -> None:
     assert caught.value is error
     assert transaction.__aexit__.await_args.args[0] is MRPNotFoundError
     assert transaction.__aexit__.await_args.args[1] is error
+
+
+def test_cfo_feature_error_exits_transaction_unchanged() -> None:
+    session, transaction = _session_with_transaction()
+    error = facade_module.CFONotFoundError(uuid4())
+    feature = AsyncMock(side_effect=error)
+
+    with (
+        patch("sigma.modules.dictionaries.facade.rename_cfo_feature", feature),
+        pytest.raises(facade_module.CFONotFoundError) as caught,
+    ):
+        asyncio.run(DictionariesFacade(session).rename_cfo(error.cfo_id, "Закупки"))
+
+    assert caught.value is error
+    exit_args = transaction.__aexit__.await_args.args
+    assert exit_args[0] is facade_module.CFONotFoundError
+    assert exit_args[1] is error

@@ -11,6 +11,8 @@ from sigma.modules.dictionaries.presentation.schemas import (
     BudgetArticleView,
     CategoryInput,
     CategoryView,
+    CFOInput,
+    CFOView,
     MRPInput,
     MRPView,
 )
@@ -50,6 +52,7 @@ def test_budget_article_category_input_parses_category_id() -> None:
 @pytest.mark.parametrize(
     ("schema", "data"),
     [
+        (CFOInput, {"name": "Закупки"}),
         (CategoryInput, {"name": "Транспорт"}),
         (MRPInput, {"name": "Иванов"}),
         (BudgetArticleInput, {"name": "Авиабилеты", "category_id": uuid4()}),
@@ -79,6 +82,18 @@ def test_category_view_reads_object_attributes() -> None:
     assert view.model_dump(mode="json") == {
         "id": str(category_id),
         "name": "Транспорт",
+        "is_archived": False,
+    }
+
+
+def test_cfo_view_reads_attributes_without_exposing_normalized_name() -> None:
+    cfo = SimpleNamespace(id=uuid4(), name="Закупки", is_archived=False, normalized_name="закупки")
+
+    view = CFOView.model_validate(cfo)
+
+    assert view.model_dump(mode="json") == {
+        "id": str(cfo.id),
+        "name": "Закупки",
         "is_archived": False,
     }
 

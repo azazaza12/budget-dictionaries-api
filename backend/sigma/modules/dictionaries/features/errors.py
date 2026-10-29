@@ -22,6 +22,14 @@ class CategoryNotFoundError(DictionariesFeatureError):
         super().__init__(f"Category {category_id} was not found")
 
 
+class CFONotFoundError(DictionariesFeatureError):
+    code = "cfo_not_found"
+
+    def __init__(self, cfo_id: UUID) -> None:
+        self.cfo_id = cfo_id
+        super().__init__(f"CFO {cfo_id} was not found")
+
+
 class BudgetArticleNotFoundError(DictionariesFeatureError):
     code = "budget_article_not_found"
 

@@ -3,6 +3,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .domain import (
+    CFO,
     MRP,
     ArchivedCategoryError,
     ArticleCategoryMismatchError,
@@ -13,30 +14,37 @@ from .domain import (
 )
 from .features.archive_article import archive_article as archive_article_feature
 from .features.archive_category import archive_category as archive_category_feature
+from .features.archive_cfo import archive_cfo as archive_cfo_feature
 from .features.archive_mrp import archive_mrp as archive_mrp_feature
 from .features.create_article import create_article as create_article_feature
 from .features.create_category import create_category as create_category_feature
+from .features.create_cfo import create_cfo as create_cfo_feature
 from .features.create_mrp import create_mrp as create_mrp_feature
 from .features.errors import (
     BudgetArticleNotFoundError,
     CategoryNotFoundError,
+    CFONotFoundError,
     DictionariesFeatureError,
     DuplicateDictionaryNameError,
     MRPNotFoundError,
 )
 from .features.list_articles import list_articles as list_articles_feature
 from .features.list_categories import list_categories as list_categories_feature
+from .features.list_cfos import list_cfos as list_cfos_feature
 from .features.list_mrps import list_mrps as list_mrps_feature
 from .features.move_article import move_article as move_article_feature
 from .features.rename_article import rename_article as rename_article_feature
 from .features.rename_category import rename_category as rename_category_feature
+from .features.rename_cfo import rename_cfo as rename_cfo_feature
 from .features.rename_mrp import rename_mrp as rename_mrp_feature
 from .features.restore_article import restore_article as restore_article_feature
 from .features.restore_category import restore_category as restore_category_feature
+from .features.restore_cfo import restore_cfo as restore_cfo_feature
 from .features.restore_mrp import restore_mrp as restore_mrp_feature
 from .repository import (
     SqlAlchemyBudgetArticleRepository,
     SqlAlchemyCategoryRepository,
+    SqlAlchemyCFORepository,
     SqlAlchemyMRPRepository,
 )
 
@@ -44,6 +52,7 @@ __all__ = (
     "ArchivedCategoryError",
     "ArticleCategoryMismatchError",
     "BudgetArticleNotFoundError",
+    "CFONotFoundError",
     "CategoryNotFoundError",
     "DictionariesDomainError",
     "DictionariesFacade",
@@ -60,6 +69,7 @@ class DictionariesFacade:
         self._category_repository = SqlAlchemyCategoryRepository(session)
         self._article_repository = SqlAlchemyBudgetArticleRepository(session)
         self._mrp_repository = SqlAlchemyMRPRepository(session)
+        self._cfo_repository = SqlAlchemyCFORepository(session)
 
     async def create_category(self, name: str) -> Category:
         async with self._session.begin():
@@ -157,3 +167,22 @@ class DictionariesFacade:
 
     async def list_mrps(self, *, include_archived: bool = False) -> list[MRP]:
         return await list_mrps_feature(self._mrp_repository, include_archived=include_archived)
+
+    async def create_cfo(self, name: str) -> CFO:
+        async with self._session.begin():
+            return await create_cfo_feature(name, self._cfo_repository)
+
+    async def rename_cfo(self, cfo_id: UUID, new_name: str) -> CFO:
+        async with self._session.begin():
+            return await rename_cfo_feature(cfo_id, new_name, self._cfo_repository)
+
+    async def archive_cfo(self, cfo_id: UUID) -> CFO:
+        async with self._session.begin():
+            return await archive_cfo_feature(cfo_id, self._cfo_repository)
+
+    async def restore_cfo(self, cfo_id: UUID) -> CFO:
+        async with self._session.begin():
+            return await restore_cfo_feature(cfo_id, self._cfo_repository)
+
+    async def list_cfos(self, *, include_archived: bool = False) -> list[CFO]:
+        return await list_cfos_feature(self._cfo_repository, include_archived=include_archived)
