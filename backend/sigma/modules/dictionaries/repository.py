@@ -4,8 +4,14 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .domain import CFO, MRP, BudgetArticle, Category
-from .models import BudgetArticleModel, CategoryModel, CFOModel, MRPModel
+from .domain import CFO, MRP, BudgetArticle, Category, SavingsDistributionRule
+from .models import (
+    BudgetArticleModel,
+    CategoryModel,
+    CFOModel,
+    MRPModel,
+    SavingsDistributionRuleModel,
+)
 
 
 class CategoryRepository(Protocol):
@@ -72,6 +78,18 @@ class CFORepository(Protocol):
     async def name_exists(
         self, normalized_name: str, *, exclude_id: UUID | None = None
     ) -> bool: ...
+
+
+class SavingsDistributionRuleRepository(Protocol):
+    async def get(self, rule_id: UUID) -> SavingsDistributionRule | None: ...
+
+    async def add(self, rule: SavingsDistributionRule) -> None: ...
+
+    async def find_by_pair(
+        self, cfo_id: UUID, budget_article_id: UUID
+    ) -> SavingsDistributionRule | None: ...
+
+    async def save(self, rule: SavingsDistributionRule) -> None: ...
 
 
 class SqlAlchemyCategoryRepository:
@@ -285,3 +303,51 @@ class SqlAlchemyCFORepository:
             query = query.where(CFOModel.id != exclude_id)
         statement = select(query.exists())
         return bool(await self._session.scalar(statement))
+
+
+class SqlAlchemySavingsDistributionRuleRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    @staticmethod
+    def _to_domain(model: SavingsDistributionRuleModel) -> SavingsDistributionRule:
+        return SavingsDistributionRule(
+            id=model.id,
+            cfo_id=model.cfo_id,
+            budget_article_id=model.budget_article_id,
+            mrp_id=model.mrp_id,
+        )
+
+    @staticmethod
+    def _to_model(rule: SavingsDistributionRule) -> SavingsDistributionRuleModel:
+        return SavingsDistributionRuleModel(
+            id=rule.id,
+            cfo_id=rule.cfo_id,
+            budget_article_id=rule.budget_article_id,
+            mrp_id=rule.mrp_id,
+        )
+
+    async def get(self, rule_id: UUID) -> SavingsDistributionRule | None:
+        model = await self._session.get(SavingsDistributionRuleModel, rule_id)
+        if model is None:
+            return None
+        return self._to_domain(model)
+
+    async def add(self, rule: SavingsDistributionRule) -> None:
+        model = self._to_model(rule)
+        self._session.add(model)
+
+    async def find_by_pair(
+        self, cfo_id: UUID, budget_article_id: UUID
+    ) -> SavingsDistributionRule | None:
+        statement = select(SavingsDistributionRuleModel).where(
+            SavingsDistributionRuleModel.cfo_id == cfo_id,
+            SavingsDistributionRuleModel.budget_article_id == budget_article_id,
+        )
+        model = await self._session.scalar(statement)
+        if model is None:
+            return None
+        return self._to_domain(model)
+
+    async def save(self, rule: SavingsDistributionRule) -> None:
+        await self._session.merge(self._to_model(rule))

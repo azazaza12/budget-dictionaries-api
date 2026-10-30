@@ -5,14 +5,107 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sigma.modules.dictionaries.domain import CFO, MRP, BudgetArticle, Category
-from sigma.modules.dictionaries.models import BudgetArticleModel, CategoryModel, CFOModel, MRPModel
+from sigma.modules.dictionaries.domain import (
+    CFO,
+    MRP,
+    BudgetArticle,
+    Category,
+    SavingsDistributionRule,
+)
+from sigma.modules.dictionaries.models import (
+    BudgetArticleModel,
+    CategoryModel,
+    CFOModel,
+    MRPModel,
+    SavingsDistributionRuleModel,
+)
 from sigma.modules.dictionaries.repository import (
     SqlAlchemyBudgetArticleRepository,
     SqlAlchemyCategoryRepository,
     SqlAlchemyCFORepository,
     SqlAlchemyMRPRepository,
+    SqlAlchemySavingsDistributionRuleRepository,
 )
+
+
+@pytest.mark.parametrize("found", [False, True])
+def test_get_distribution_rule(found: bool) -> None:
+    rule = SavingsDistributionRule(cfo_id=uuid4(), budget_article_id=uuid4(), mrp_id=uuid4())
+    model = SavingsDistributionRuleModel(
+        id=rule.id, cfo_id=rule.cfo_id, budget_article_id=rule.budget_article_id, mrp_id=rule.mrp_id
+    )
+    session = MagicMock(spec=AsyncSession)
+    session.get = AsyncMock(return_value=model if found else None)
+    repository = SqlAlchemySavingsDistributionRuleRepository(session)
+
+    result = asyncio.run(repository.get(rule.id))
+
+    assert result == (rule if found else None)
+    session.get.assert_awaited_once_with(SavingsDistributionRuleModel, rule.id)
+
+
+@pytest.mark.parametrize("found", [False, True])
+def test_find_distribution_rule_by_pair(found: bool) -> None:
+    rule = SavingsDistributionRule(cfo_id=uuid4(), budget_article_id=uuid4(), mrp_id=uuid4())
+    model = SavingsDistributionRuleModel(
+        id=rule.id, cfo_id=rule.cfo_id, budget_article_id=rule.budget_article_id, mrp_id=rule.mrp_id
+    )
+    session = MagicMock(spec=AsyncSession)
+    session.scalar = AsyncMock(return_value=model if found else None)
+    repository = SqlAlchemySavingsDistributionRuleRepository(session)
+
+    result = asyncio.run(repository.find_by_pair(rule.cfo_id, rule.budget_article_id))
+
+    assert result == (rule if found else None)
+    session.scalar.assert_awaited_once()
+    statement = session.scalar.await_args.args[0]
+    sql = str(statement)
+    where_clause = sql.split("WHERE", maxsplit=1)[1]
+    assert "savings_distribution_rules.cfo_id =" in where_clause
+    assert "savings_distribution_rules.budget_article_id =" in where_clause
+    assert "mrp_id" not in where_clause
+    assert "is_archived" not in sql
+    assert "JOIN" not in sql
+    assert set(statement.compile().params.values()) == {rule.cfo_id, rule.budget_article_id}
+
+
+def test_add_distribution_rule_maps_domain_to_model() -> None:
+    rule = SavingsDistributionRule(cfo_id=uuid4(), budget_article_id=uuid4(), mrp_id=uuid4())
+    session = MagicMock(spec=AsyncSession)
+    repository = SqlAlchemySavingsDistributionRuleRepository(session)
+
+    asyncio.run(repository.add(rule))
+
+    session.add.assert_called_once()
+    model = session.add.call_args.args[0]
+    assert isinstance(model, SavingsDistributionRuleModel)
+    assert (model.id, model.cfo_id, model.budget_article_id, model.mrp_id) == (
+        rule.id,
+        rule.cfo_id,
+        rule.budget_article_id,
+        rule.mrp_id,
+    )
+    session.commit.assert_not_called()
+
+
+def test_save_distribution_rule_merges_model() -> None:
+    rule = SavingsDistributionRule(cfo_id=uuid4(), budget_article_id=uuid4(), mrp_id=uuid4())
+    session = MagicMock(spec=AsyncSession)
+    session.merge = AsyncMock()
+    repository = SqlAlchemySavingsDistributionRuleRepository(session)
+
+    asyncio.run(repository.save(rule))
+
+    session.merge.assert_awaited_once()
+    model = session.merge.await_args.args[0]
+    assert isinstance(model, SavingsDistributionRuleModel)
+    assert (model.id, model.cfo_id, model.budget_article_id, model.mrp_id) == (
+        rule.id,
+        rule.cfo_id,
+        rule.budget_article_id,
+        rule.mrp_id,
+    )
+    session.commit.assert_not_called()
 
 
 def test_get_missing_cfo_returns_none() -> None:
