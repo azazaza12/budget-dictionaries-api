@@ -52,3 +52,11 @@ class DuplicateSavingsDistributionRuleError(DictionariesFeatureError):
     def __init__(self, rule_id: UUID) -> None:
         self.rule_id = rule_id
         super().__init__(f"Savings distribution rule {rule_id} already exists")
+
+
+class SavingsDistributionRuleNotFoundError(DictionariesFeatureError):
+    code = "savings_distribution_rule_not_found"
+
+    def __init__(self, rule_id: UUID) -> None:
+        self.rule_id = rule_id
+        super().__init__(f"Savings distribution rule {rule_id} was not found")
