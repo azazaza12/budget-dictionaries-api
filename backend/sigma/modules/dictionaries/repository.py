@@ -1,7 +1,7 @@
 from typing import Protocol
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .domain import CFO, MRP, BudgetArticle, Category, SavingsDistributionRule
@@ -90,6 +90,8 @@ class SavingsDistributionRuleRepository(Protocol):
     ) -> SavingsDistributionRule | None: ...
 
     async def save(self, rule: SavingsDistributionRule) -> None: ...
+
+    async def delete(self, rule: SavingsDistributionRule) -> None: ...
 
 
 class SqlAlchemyCategoryRepository:
@@ -351,3 +353,9 @@ class SqlAlchemySavingsDistributionRuleRepository:
 
     async def save(self, rule: SavingsDistributionRule) -> None:
         await self._session.merge(self._to_model(rule))
+
+    async def delete(self, rule: SavingsDistributionRule) -> None:
+        statement = delete(SavingsDistributionRuleModel).where(
+            SavingsDistributionRuleModel.id == rule.id
+        )
+        await self._session.execute(statement)

@@ -116,6 +116,23 @@ def test_get_missing_cfo_returns_none() -> None:
     assert asyncio.run(repository.get(uuid4())) is None
 
 
+def test_delete_distribution_rule_targets_only_selected_rule() -> None:
+    rule = SavingsDistributionRule(cfo_id=uuid4(), budget_article_id=uuid4(), mrp_id=uuid4())
+    session = MagicMock(spec=AsyncSession)
+    session.execute = AsyncMock()
+    repository = SqlAlchemySavingsDistributionRuleRepository(session)
+
+    asyncio.run(repository.delete(rule))
+
+    session.execute.assert_awaited_once()
+    statement = session.execute.await_args.args[0]
+    assert str(statement) == (
+        "DELETE FROM savings_distribution_rules WHERE savings_distribution_rules.id = :id_1"
+    )
+    assert list(statement.compile().params.values()) == [rule.id]
+    session.commit.assert_not_called()
+
+
 @pytest.mark.parametrize("include_archived", [False, True])
 def test_list_cfos_maps_models_and_filters_archived(include_archived: bool) -> None:
     cfo_id = uuid4()
