@@ -44,3 +44,11 @@ class MRPNotFoundError(DictionariesFeatureError):
     def __init__(self, mrp_id: UUID) -> None:
         self.mrp_id = mrp_id
         super().__init__(f"MRP {mrp_id} was not found")
+
+
+class DuplicateSavingsDistributionRuleError(DictionariesFeatureError):
+    code = "duplicate_savings_distribution_rule"
+
+    def __init__(self, rule_id: UUID) -> None:
+        self.rule_id = rule_id
+        super().__init__(f"Savings distribution rule {rule_id} already exists")
