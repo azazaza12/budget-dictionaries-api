@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Protocol
 from uuid import UUID
 
@@ -80,8 +81,19 @@ class CFORepository(Protocol):
     ) -> bool: ...
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
+class SavingsDistributionRuleListItem:
+    rule: SavingsDistributionRule
+    cfo: CFO
+    budget_article: BudgetArticle
+    category: Category
+    mrp: MRP
+
+
 class SavingsDistributionRuleRepository(Protocol):
     async def get(self, rule_id: UUID) -> SavingsDistributionRule | None: ...
+
+    async def list(self) -> list[SavingsDistributionRuleListItem]: ...
 
     async def add(self, rule: SavingsDistributionRule) -> None: ...
 
@@ -359,3 +371,38 @@ class SqlAlchemySavingsDistributionRuleRepository:
             SavingsDistributionRuleModel.id == rule.id
         )
         await self._session.execute(statement)
+
+    async def list(self) -> list[SavingsDistributionRuleListItem]:
+        statement = (
+            select(
+                SavingsDistributionRuleModel,
+                CFOModel,
+                BudgetArticleModel,
+                CategoryModel,
+                MRPModel,
+            )
+            .select_from(SavingsDistributionRuleModel)
+            .join(CFOModel, SavingsDistributionRuleModel.cfo_id == CFOModel.id)
+            .join(
+                BudgetArticleModel,
+                SavingsDistributionRuleModel.budget_article_id == BudgetArticleModel.id,
+            )
+            .join(CategoryModel, BudgetArticleModel.category_id == CategoryModel.id)
+            .join(MRPModel, SavingsDistributionRuleModel.mrp_id == MRPModel.id)
+            .order_by(
+                CFOModel.normalized_name,
+                BudgetArticleModel.normalized_name,
+                SavingsDistributionRuleModel.id,
+            )
+        )
+        rows = (await self._session.execute(statement)).all()
+        return [
+            SavingsDistributionRuleListItem(
+                rule=self._to_domain(rule),
+                cfo=SqlAlchemyCFORepository._to_domain(cfo),
+                budget_article=SqlAlchemyBudgetArticleRepository._to_domain(article),
+                category=SqlAlchemyCategoryRepository._to_domain(category),
+                mrp=SqlAlchemyMRPRepository._to_domain(mrp),
+            )
+            for rule, cfo, article, category, mrp in rows
+        ]

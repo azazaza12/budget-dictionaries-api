@@ -20,6 +20,7 @@ from sigma.modules.dictionaries.models import (
     SavingsDistributionRuleModel,
 )
 from sigma.modules.dictionaries.repository import (
+    SavingsDistributionRuleListItem,
     SqlAlchemyBudgetArticleRepository,
     SqlAlchemyCategoryRepository,
     SqlAlchemyCFORepository,
@@ -42,6 +43,91 @@ def test_get_distribution_rule(found: bool) -> None:
 
     assert result == (rule if found else None)
     session.get.assert_awaited_once_with(SavingsDistributionRuleModel, rule.id)
+
+
+@pytest.mark.parametrize(
+    ("cfo_archived", "article_archived", "mrp_archived"),
+    [
+        (False, False, False),
+        (True, False, False),
+        (False, True, False),
+        (False, False, True),
+        (True, True, True),
+    ],
+)
+def test_list_distribution_rules_maps_joined_records_without_archive_filter(
+    cfo_archived: bool,
+    article_archived: bool,
+    mrp_archived: bool,
+) -> None:
+    cfo = CFOModel(id=uuid4(), name="Закупки", normalized_name="закупки", is_archived=cfo_archived)
+    category = CategoryModel(
+        id=uuid4(), name="Командировки", normalized_name="командировки", is_archived=True
+    )
+    article = BudgetArticleModel(
+        id=uuid4(),
+        name="Билеты",
+        normalized_name="билеты",
+        category_id=category.id,
+        is_archived=article_archived,
+    )
+    mrp = MRPModel(id=uuid4(), name="Иванов", normalized_name="иванов", is_archived=mrp_archived)
+    rule = SavingsDistributionRuleModel(
+        id=uuid4(), cfo_id=cfo.id, budget_article_id=article.id, mrp_id=mrp.id
+    )
+    item = SavingsDistributionRuleListItem(
+        rule=SavingsDistributionRule(
+            id=rule.id,
+            cfo_id=cfo.id,
+            budget_article_id=article.id,
+            mrp_id=mrp.id,
+        ),
+        cfo=CFO(id=cfo.id, name=cfo.name, is_archived=cfo_archived),
+        budget_article=BudgetArticle(
+            id=article.id,
+            name=article.name,
+            category_id=category.id,
+            is_archived=article_archived,
+        ),
+        category=Category(id=category.id, name=category.name, is_archived=True),
+        mrp=MRP(id=mrp.id, name=mrp.name, is_archived=mrp_archived),
+    )
+    session = MagicMock(spec=AsyncSession)
+    result = MagicMock()
+    result.all.return_value = [(rule, cfo, article, category, mrp)]
+    session.execute = AsyncMock(return_value=result)
+    repository = SqlAlchemySavingsDistributionRuleRepository(session)
+
+    items = asyncio.run(repository.list())
+
+    assert items == [item]
+    session.execute.assert_awaited_once()
+    sql = str(session.execute.await_args.args[0])
+    assert "JOIN cfo ON savings_distribution_rules.cfo_id = cfo.id" in sql
+    assert (
+        "JOIN budget_articles ON savings_distribution_rules.budget_article_id = budget_articles.id"
+    ) in sql
+    assert "JOIN budget_categories ON budget_articles.category_id = budget_categories.id" in sql
+    assert "JOIN mrp ON savings_distribution_rules.mrp_id = mrp.id" in sql
+    assert (
+        "ORDER BY cfo.normalized_name, budget_articles.normalized_name, "
+        "savings_distribution_rules.id"
+    ) in sql
+    assert "WHERE" not in sql
+    assert "LIMIT" not in sql
+    assert "OFFSET" not in sql
+    session.get.assert_not_called()
+
+
+def test_list_distribution_rules_returns_empty_list() -> None:
+    session = MagicMock(spec=AsyncSession)
+    result = MagicMock()
+    result.all.return_value = []
+    session.execute = AsyncMock(return_value=result)
+    repository = SqlAlchemySavingsDistributionRuleRepository(session)
+
+    assert asyncio.run(repository.list()) == []
+    session.execute.assert_awaited_once()
 
 
 @pytest.mark.parametrize("found", [False, True])
