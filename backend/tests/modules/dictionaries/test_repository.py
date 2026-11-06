@@ -5,13 +5,68 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sigma.modules.dictionaries.domain import MRP, BudgetArticle, Category
-from sigma.modules.dictionaries.models import BudgetArticleModel, CategoryModel, MRPModel
+from sigma.modules.dictionaries.domain import CFO, MRP, BudgetArticle, Category
+from sigma.modules.dictionaries.models import BudgetArticleModel, CategoryModel, CFOModel, MRPModel
 from sigma.modules.dictionaries.repository import (
     SqlAlchemyBudgetArticleRepository,
     SqlAlchemyCategoryRepository,
+    SqlAlchemyCFORepository,
     SqlAlchemyMRPRepository,
 )
+
+
+def test_get_missing_cfo_returns_none() -> None:
+    session = MagicMock(spec=AsyncSession)
+    session.get = AsyncMock(return_value=None)
+    repository = SqlAlchemyCFORepository(session)
+
+    assert asyncio.run(repository.get(uuid4())) is None
+
+
+@pytest.mark.parametrize("include_archived", [False, True])
+def test_list_cfos_maps_models_and_filters_archived(include_archived: bool) -> None:
+    cfo_id = uuid4()
+    result = MagicMock()
+    result.all.return_value = [
+        CFOModel(
+            id=cfo_id,
+            name="Закупки",
+            normalized_name="закупки",
+            is_archived=False,
+        )
+    ]
+    session = MagicMock(spec=AsyncSession)
+    session.scalars = AsyncMock(return_value=result)
+    repository = SqlAlchemyCFORepository(session)
+
+    cfos = asyncio.run(repository.list(include_archived=include_archived))
+
+    assert cfos == [CFO(id=cfo_id, name="Закупки")]
+    statement = str(session.scalars.await_args.args[0])
+    assert ("cfo.is_archived IS false" in statement) is not include_archived
+    assert "ORDER BY cfo.normalized_name, cfo.id" in statement
+
+
+@pytest.mark.parametrize("exclude_self", [False, True])
+@pytest.mark.parametrize("exists", [False, True])
+def test_cfo_name_existence_query(exclude_self: bool, exists: bool) -> None:
+    session = MagicMock(spec=AsyncSession)
+    session.scalar = AsyncMock(return_value=exists)
+    repository = SqlAlchemyCFORepository(session)
+    excluded_id = uuid4() if exclude_self else None
+
+    result = asyncio.run(repository.name_exists("закупки", exclude_id=excluded_id))
+
+    assert result is exists
+    statement = session.scalar.await_args.args[0]
+    sql = str(statement)
+    assert "EXISTS (SELECT cfo.id" in sql
+    assert "cfo.normalized_name =" in sql
+    assert "is_archived" not in sql
+    assert ("cfo.id !=" in sql) is exclude_self
+    assert "закупки" in statement.compile().params.values()
+    if excluded_id is not None:
+        assert excluded_id in statement.compile().params.values()
 
 
 def test_get_category_maps_model_to_domain() -> None:

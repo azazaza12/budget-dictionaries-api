@@ -10,6 +10,7 @@ from sigma.main import create_app
 from sigma.modules.dictionaries.facade import (
     ArchivedCategoryError,
     CategoryNotFoundError,
+    CFONotFoundError,
     DictionariesFacade,
     InvalidDictionaryNameError,
 )
@@ -38,6 +39,10 @@ def test_application_exposes_all_dictionary_routes(dictionaries_api: Dictionarie
     assert response.status_code == 200
     paths = response.json()["paths"]
     expected_routes = {
+        "/dictionaries/cfos": {"get", "post"},
+        "/dictionaries/cfos/{cfo_id}": {"put"},
+        "/dictionaries/cfos/{cfo_id}/archive": {"post"},
+        "/dictionaries/cfos/{cfo_id}/restore": {"post"},
         "/dictionaries/categories": {"get", "post"},
         "/dictionaries/categories/{category_id}": {"put"},
         "/dictionaries/categories/{category_id}/archive": {"post"},
@@ -56,7 +61,7 @@ def test_application_exposes_all_dictionary_routes(dictionaries_api: Dictionarie
         assert set(paths[path]) == methods
 
 
-@pytest.mark.parametrize("resource", ["categories", "articles", "mrps"])
+@pytest.mark.parametrize("resource", ["categories", "articles", "mrps", "cfos"])
 def test_application_serves_dictionary_lists(
     resource: str,
     dictionaries_api: DictionariesApi,
@@ -85,6 +90,19 @@ def test_application_handles_feature_errors(dictionaries_api: DictionariesApi) -
     assert response.json() == {
         "code": "category_not_found",
         "context": {"category_id": str(category_id)},
+    }
+
+
+def test_application_handles_missing_cfo(dictionaries_api: DictionariesApi) -> None:
+    cfo_id = uuid4()
+    dictionaries_api.dictionaries.rename_cfo = AsyncMock(side_effect=CFONotFoundError(cfo_id))
+
+    response = dictionaries_api.client.put(f"/dictionaries/cfos/{cfo_id}", json={"name": "Закупки"})
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "code": "cfo_not_found",
+        "context": {"cfo_id": str(cfo_id)},
     }
 
 
