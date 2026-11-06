@@ -12,30 +12,30 @@ from sigma.modules.dictionaries.domain import (
     ArchivedMRPError,
     BudgetArticle,
     DictionariesDomainError,
-    SavingsDistributionRule,
+    DistributionRule,
 )
 from sigma.modules.dictionaries.features.errors import (
     BudgetArticleNotFoundError,
     CFONotFoundError,
     DictionariesFeatureError,
-    DuplicateSavingsDistributionRuleError,
+    DistributionRuleNotFoundError,
+    DuplicateDistributionRuleError,
     MRPNotFoundError,
-    SavingsDistributionRuleNotFoundError,
 )
-from sigma.modules.dictionaries.features.update_savings_distribution_rule import (
-    update_savings_distribution_rule,
+from sigma.modules.dictionaries.features.update_distribution_rule import (
+    update_distribution_rule,
 )
 from sigma.modules.dictionaries.repository import (
     BudgetArticleRepository,
     CFORepository,
+    DistributionRuleRepository,
     MRPRepository,
-    SavingsDistributionRuleRepository,
 )
 
 
 @pytest.fixture
-def rule() -> SavingsDistributionRule:
-    return SavingsDistributionRule(cfo_id=uuid4(), budget_article_id=uuid4(), mrp_id=uuid4())
+def rule() -> DistributionRule:
+    return DistributionRule(cfo_id=uuid4(), budget_article_id=uuid4(), mrp_id=uuid4())
 
 
 @pytest.fixture
@@ -49,13 +49,13 @@ def references() -> tuple[CFO, BudgetArticle, MRP]:
 
 @pytest.fixture
 def repositories(
-    rule: SavingsDistributionRule,
+    rule: DistributionRule,
     references: tuple[CFO, BudgetArticle, MRP],
 ) -> tuple[MagicMock, MagicMock, MagicMock, MagicMock]:
     cfo_repository = MagicMock(spec=CFORepository)
     article_repository = MagicMock(spec=BudgetArticleRepository)
     mrp_repository = MagicMock(spec=MRPRepository)
-    rule_repository = MagicMock(spec=SavingsDistributionRuleRepository)
+    rule_repository = MagicMock(spec=DistributionRuleRepository)
     for repository, reference in zip(
         (cfo_repository, article_repository, mrp_repository), references, strict=True
     ):
@@ -67,13 +67,13 @@ def repositories(
 
 
 def update_rule(
-    rule: SavingsDistributionRule,
+    rule: DistributionRule,
     references: tuple[CFO, BudgetArticle, MRP],
     repositories: tuple[MagicMock, MagicMock, MagicMock, MagicMock],
-) -> SavingsDistributionRule:
+) -> DistributionRule:
     cfo, article, mrp = references
     return asyncio.run(
-        update_savings_distribution_rule(
+        update_distribution_rule(
             rule.id,
             cfo.id,
             article.id,
@@ -87,7 +87,7 @@ def update_rule(
 
 
 def test_update_rule_saves_selected_references(
-    rule: SavingsDistributionRule,
+    rule: DistributionRule,
     references: tuple[CFO, BudgetArticle, MRP],
     repositories: tuple[MagicMock, MagicMock, MagicMock, MagicMock],
 ) -> None:
@@ -106,13 +106,13 @@ def test_update_rule_saves_selected_references(
 
 
 def test_update_missing_rule_is_rejected(
-    rule: SavingsDistributionRule,
+    rule: DistributionRule,
     references: tuple[CFO, BudgetArticle, MRP],
     repositories: tuple[MagicMock, MagicMock, MagicMock, MagicMock],
 ) -> None:
     repositories[3].get.return_value = None
 
-    with pytest.raises(SavingsDistributionRuleNotFoundError) as error:
+    with pytest.raises(DistributionRuleNotFoundError) as error:
         update_rule(rule, references, repositories)
 
     assert error.value.rule_id == rule.id
@@ -128,7 +128,7 @@ def test_update_missing_rule_is_rejected(
     [(0, CFONotFoundError), (1, BudgetArticleNotFoundError), (2, MRPNotFoundError)],
 )
 def test_update_rule_rejects_missing_reference(
-    rule: SavingsDistributionRule,
+    rule: DistributionRule,
     references: tuple[CFO, BudgetArticle, MRP],
     repositories: tuple[MagicMock, MagicMock, MagicMock, MagicMock],
     reference_index: int,
@@ -146,17 +146,17 @@ def test_update_rule_rejects_missing_reference(
 
 
 def test_update_rule_rejects_conflicting_pair_without_mutation(
-    rule: SavingsDistributionRule,
+    rule: DistributionRule,
     references: tuple[CFO, BudgetArticle, MRP],
     repositories: tuple[MagicMock, MagicMock, MagicMock, MagicMock],
 ) -> None:
     original_ids = (rule.cfo_id, rule.budget_article_id, rule.mrp_id)
-    existing = SavingsDistributionRule(
+    existing = DistributionRule(
         cfo_id=references[0].id, budget_article_id=references[1].id, mrp_id=uuid4()
     )
     repositories[3].find_by_pair.return_value = existing
 
-    with pytest.raises(DuplicateSavingsDistributionRuleError) as error:
+    with pytest.raises(DuplicateDistributionRuleError) as error:
         update_rule(rule, references, repositories)
 
     assert error.value.rule_id == existing.id
@@ -169,7 +169,7 @@ def test_update_rule_rejects_conflicting_pair_without_mutation(
     [(0, ArchivedCFOError), (1, ArchivedBudgetArticleError), (2, ArchivedMRPError)],
 )
 def test_update_rule_rejects_archived_replacement_without_mutation(
-    rule: SavingsDistributionRule,
+    rule: DistributionRule,
     references: tuple[CFO, BudgetArticle, MRP],
     repositories: tuple[MagicMock, MagicMock, MagicMock, MagicMock],
     reference_index: int,
@@ -186,7 +186,7 @@ def test_update_rule_rejects_archived_replacement_without_mutation(
 
 
 def test_update_rule_allows_own_pair_and_retains_archived_references(
-    rule: SavingsDistributionRule,
+    rule: DistributionRule,
     references: tuple[CFO, BudgetArticle, MRP],
     repositories: tuple[MagicMock, MagicMock, MagicMock, MagicMock],
 ) -> None:

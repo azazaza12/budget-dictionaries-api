@@ -151,14 +151,14 @@ class CFO(BaseDictionary):
 
 
 @dataclass(kw_only=True, slots=True)
-class SavingsDistributionRule:
+class DistributionRule:
     id: UUID = field(default_factory=uuid4)
     cfo_id: UUID
     budget_article_id: UUID
     mrp_id: UUID
 
     @classmethod
-    def create(cls, cfo: CFO, budget_article: BudgetArticle, mrp: MRP) -> SavingsDistributionRule:
+    def create(cls, cfo: CFO, budget_article: BudgetArticle, mrp: MRP) -> DistributionRule:
         cfo.require_active()
         budget_article.require_active()
         mrp.require_active()

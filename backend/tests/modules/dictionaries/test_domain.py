@@ -13,8 +13,8 @@ from sigma.modules.dictionaries.domain import (
     BudgetArticle,
     Category,
     DictionariesDomainError,
+    DistributionRule,
     InvalidDictionaryNameError,
-    SavingsDistributionRule,
     clean_name,
     normalize_name,
 )
@@ -68,7 +68,7 @@ def rule_references() -> tuple[CFO, BudgetArticle, MRP]:
 def test_rule_can_be_created(rule_references: tuple[CFO, BudgetArticle, MRP]) -> None:
     cfo, article, mrp = rule_references
 
-    rule = SavingsDistributionRule.create(cfo, article, mrp)
+    rule = DistributionRule.create(cfo, article, mrp)
 
     assert rule.cfo_id == cfo.id
     assert rule.budget_article_id == article.id
@@ -76,8 +76,8 @@ def test_rule_can_be_created(rule_references: tuple[CFO, BudgetArticle, MRP]) ->
 
 
 def test_rules_generate_independent_ids(rule_references: tuple[CFO, BudgetArticle, MRP]) -> None:
-    first = SavingsDistributionRule.create(*rule_references)
-    second = SavingsDistributionRule.create(*rule_references)
+    first = DistributionRule.create(*rule_references)
+    second = DistributionRule.create(*rule_references)
 
     assert first.id != second.id
 
@@ -85,9 +85,7 @@ def test_rules_generate_independent_ids(rule_references: tuple[CFO, BudgetArticl
 def test_rule_preserves_provided_id() -> None:
     rule_id = uuid4()
 
-    rule = SavingsDistributionRule(
-        id=rule_id, cfo_id=uuid4(), budget_article_id=uuid4(), mrp_id=uuid4()
-    )
+    rule = DistributionRule(id=rule_id, cfo_id=uuid4(), budget_article_id=uuid4(), mrp_id=uuid4())
 
     assert rule.id == rule_id
 
@@ -95,7 +93,7 @@ def test_rule_preserves_provided_id() -> None:
 def test_rule_can_be_updated_without_changing_id(
     rule_references: tuple[CFO, BudgetArticle, MRP],
 ) -> None:
-    rule = SavingsDistributionRule(cfo_id=uuid4(), budget_article_id=uuid4(), mrp_id=uuid4())
+    rule = DistributionRule(cfo_id=uuid4(), budget_article_id=uuid4(), mrp_id=uuid4())
     original_id = rule.id
     cfo, article, mrp = rule_references
 
@@ -120,7 +118,7 @@ def test_rule_rejects_archived_reference_on_creation(
     reference.archive()
 
     with pytest.raises(error_type) as error:
-        SavingsDistributionRule.create(*rule_references)
+        DistributionRule.create(*rule_references)
 
     assert str(reference.id) in str(error.value)
 
@@ -134,7 +132,7 @@ def test_rule_rejects_archived_replacement_without_mutation(
     reference_index: int,
     error_type: type[DictionariesDomainError],
 ) -> None:
-    rule = SavingsDistributionRule(cfo_id=uuid4(), budget_article_id=uuid4(), mrp_id=uuid4())
+    rule = DistributionRule(cfo_id=uuid4(), budget_article_id=uuid4(), mrp_id=uuid4())
     original_ids = (rule.cfo_id, rule.budget_article_id, rule.mrp_id)
     rule_references[reference_index].archive()
 
@@ -149,7 +147,7 @@ def test_rule_can_replace_reference_while_retaining_other_archived_references(
     rule_references: tuple[CFO, BudgetArticle, MRP], replacement_index: int
 ) -> None:
     cfo, article, mrp = rule_references
-    rule = SavingsDistributionRule.create(cfo, article, mrp)
+    rule = DistributionRule.create(cfo, article, mrp)
     for reference in rule_references:
         reference.archive()
     new_cfo = CFO(name="Снабжение") if replacement_index == 0 else cfo
@@ -170,7 +168,7 @@ def test_rule_can_replace_reference_while_retaining_other_archived_references(
 def test_rule_can_retain_all_archived_references(
     rule_references: tuple[CFO, BudgetArticle, MRP],
 ) -> None:
-    rule = SavingsDistributionRule.create(*rule_references)
+    rule = DistributionRule.create(*rule_references)
     for reference in rule_references:
         reference.archive()
 
@@ -184,7 +182,7 @@ def test_article_category_change_does_not_change_rule(
     rule_references: tuple[CFO, BudgetArticle, MRP],
 ) -> None:
     cfo, article, mrp = rule_references
-    rule = SavingsDistributionRule.create(cfo, article, mrp)
+    rule = DistributionRule.create(cfo, article, mrp)
 
     article.move_to(Category(name="Командировки"))
 

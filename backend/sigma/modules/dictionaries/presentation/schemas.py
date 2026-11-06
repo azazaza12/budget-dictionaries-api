@@ -73,7 +73,7 @@ class BudgetArticleView(BaseModel):
     is_archived: bool
 
 
-class SavingsDistributionRuleInput(BaseModel):
+class DistributionRuleInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     cfo_id: UUID
@@ -81,7 +81,7 @@ class SavingsDistributionRuleInput(BaseModel):
     mrp_id: UUID
 
 
-class SavingsDistributionRuleView(BaseModel):
+class DistributionRuleView(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
@@ -90,10 +90,10 @@ class SavingsDistributionRuleView(BaseModel):
     mrp_id: UUID
 
 
-class SavingsDistributionRuleDetailsView(BaseModel):
+class DistributionRuleDetailsView(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    rule: SavingsDistributionRuleView
+    rule: DistributionRuleView
     cfo: CFOView
     budget_article: BudgetArticleView
     category: CategoryView

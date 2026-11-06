@@ -10,39 +10,39 @@ from sigma.modules.dictionaries.domain import (
     MRP,
     BudgetArticle,
     Category,
-    SavingsDistributionRule,
+    DistributionRule,
 )
 from sigma.modules.dictionaries.models import (
     BudgetArticleModel,
     CategoryModel,
     CFOModel,
+    DistributionRuleModel,
     MRPModel,
-    SavingsDistributionRuleModel,
 )
 from sigma.modules.dictionaries.repository import (
-    SavingsDistributionRuleDetails,
+    DistributionRuleDetails,
     SqlAlchemyBudgetArticleRepository,
     SqlAlchemyCategoryRepository,
     SqlAlchemyCFORepository,
+    SqlAlchemyDistributionRuleRepository,
     SqlAlchemyMRPRepository,
-    SqlAlchemySavingsDistributionRuleRepository,
 )
 
 
 @pytest.mark.parametrize("found", [False, True])
 def test_get_distribution_rule(found: bool) -> None:
-    rule = SavingsDistributionRule(cfo_id=uuid4(), budget_article_id=uuid4(), mrp_id=uuid4())
-    model = SavingsDistributionRuleModel(
+    rule = DistributionRule(cfo_id=uuid4(), budget_article_id=uuid4(), mrp_id=uuid4())
+    model = DistributionRuleModel(
         id=rule.id, cfo_id=rule.cfo_id, budget_article_id=rule.budget_article_id, mrp_id=rule.mrp_id
     )
     session = MagicMock(spec=AsyncSession)
     session.get = AsyncMock(return_value=model if found else None)
-    repository = SqlAlchemySavingsDistributionRuleRepository(session)
+    repository = SqlAlchemyDistributionRuleRepository(session)
 
     result = asyncio.run(repository.get(rule.id))
 
     assert result == (rule if found else None)
-    session.get.assert_awaited_once_with(SavingsDistributionRuleModel, rule.id)
+    session.get.assert_awaited_once_with(DistributionRuleModel, rule.id)
 
 
 @pytest.mark.parametrize(
@@ -72,11 +72,11 @@ def test_list_distribution_rules_maps_joined_records_without_archive_filter(
         is_archived=article_archived,
     )
     mrp = MRPModel(id=uuid4(), name="Иванов", normalized_name="иванов", is_archived=mrp_archived)
-    rule = SavingsDistributionRuleModel(
+    rule = DistributionRuleModel(
         id=uuid4(), cfo_id=cfo.id, budget_article_id=article.id, mrp_id=mrp.id
     )
-    item = SavingsDistributionRuleDetails(
-        rule=SavingsDistributionRule(
+    item = DistributionRuleDetails(
+        rule=DistributionRule(
             id=rule.id,
             cfo_id=cfo.id,
             budget_article_id=article.id,
@@ -96,22 +96,21 @@ def test_list_distribution_rules_maps_joined_records_without_archive_filter(
     result = MagicMock()
     result.all.return_value = [(rule, cfo, article, category, mrp)]
     session.execute = AsyncMock(return_value=result)
-    repository = SqlAlchemySavingsDistributionRuleRepository(session)
+    repository = SqlAlchemyDistributionRuleRepository(session)
 
     items = asyncio.run(repository.list())
 
     assert items == [item]
     session.execute.assert_awaited_once()
     sql = str(session.execute.await_args.args[0])
-    assert "JOIN cfo ON savings_distribution_rules.cfo_id = cfo.id" in sql
+    assert "JOIN cfo ON distribution_rules.cfo_id = cfo.id" in sql
     assert (
-        "JOIN budget_articles ON savings_distribution_rules.budget_article_id = budget_articles.id"
+        "JOIN budget_articles ON distribution_rules.budget_article_id = budget_articles.id"
     ) in sql
     assert "JOIN budget_categories ON budget_articles.category_id = budget_categories.id" in sql
-    assert "JOIN mrp ON savings_distribution_rules.mrp_id = mrp.id" in sql
+    assert "JOIN mrp ON distribution_rules.mrp_id = mrp.id" in sql
     assert (
-        "ORDER BY cfo.normalized_name, budget_articles.normalized_name, "
-        "savings_distribution_rules.id"
+        "ORDER BY cfo.normalized_name, budget_articles.normalized_name, distribution_rules.id"
     ) in sql
     assert "WHERE" not in sql
     assert "LIMIT" not in sql
@@ -124,7 +123,7 @@ def test_list_distribution_rules_returns_empty_list() -> None:
     result = MagicMock()
     result.all.return_value = []
     session.execute = AsyncMock(return_value=result)
-    repository = SqlAlchemySavingsDistributionRuleRepository(session)
+    repository = SqlAlchemyDistributionRuleRepository(session)
 
     assert asyncio.run(repository.list()) == []
     session.execute.assert_awaited_once()
@@ -132,13 +131,13 @@ def test_list_distribution_rules_returns_empty_list() -> None:
 
 @pytest.mark.parametrize("found", [False, True])
 def test_find_distribution_rule_by_pair(found: bool) -> None:
-    rule = SavingsDistributionRule(cfo_id=uuid4(), budget_article_id=uuid4(), mrp_id=uuid4())
-    model = SavingsDistributionRuleModel(
+    rule = DistributionRule(cfo_id=uuid4(), budget_article_id=uuid4(), mrp_id=uuid4())
+    model = DistributionRuleModel(
         id=rule.id, cfo_id=rule.cfo_id, budget_article_id=rule.budget_article_id, mrp_id=rule.mrp_id
     )
     session = MagicMock(spec=AsyncSession)
     session.scalar = AsyncMock(return_value=model if found else None)
-    repository = SqlAlchemySavingsDistributionRuleRepository(session)
+    repository = SqlAlchemyDistributionRuleRepository(session)
 
     result = asyncio.run(repository.find_by_pair(rule.cfo_id, rule.budget_article_id))
 
@@ -147,8 +146,8 @@ def test_find_distribution_rule_by_pair(found: bool) -> None:
     statement = session.scalar.await_args.args[0]
     sql = str(statement)
     where_clause = sql.split("WHERE", maxsplit=1)[1]
-    assert "savings_distribution_rules.cfo_id =" in where_clause
-    assert "savings_distribution_rules.budget_article_id =" in where_clause
+    assert "distribution_rules.cfo_id =" in where_clause
+    assert "distribution_rules.budget_article_id =" in where_clause
     assert "mrp_id" not in where_clause
     assert "is_archived" not in sql
     assert "JOIN" not in sql
@@ -156,15 +155,15 @@ def test_find_distribution_rule_by_pair(found: bool) -> None:
 
 
 def test_add_distribution_rule_maps_domain_to_model() -> None:
-    rule = SavingsDistributionRule(cfo_id=uuid4(), budget_article_id=uuid4(), mrp_id=uuid4())
+    rule = DistributionRule(cfo_id=uuid4(), budget_article_id=uuid4(), mrp_id=uuid4())
     session = MagicMock(spec=AsyncSession)
-    repository = SqlAlchemySavingsDistributionRuleRepository(session)
+    repository = SqlAlchemyDistributionRuleRepository(session)
 
     asyncio.run(repository.add(rule))
 
     session.add.assert_called_once()
     model = session.add.call_args.args[0]
-    assert isinstance(model, SavingsDistributionRuleModel)
+    assert isinstance(model, DistributionRuleModel)
     assert (model.id, model.cfo_id, model.budget_article_id, model.mrp_id) == (
         rule.id,
         rule.cfo_id,
@@ -175,16 +174,16 @@ def test_add_distribution_rule_maps_domain_to_model() -> None:
 
 
 def test_save_distribution_rule_merges_model() -> None:
-    rule = SavingsDistributionRule(cfo_id=uuid4(), budget_article_id=uuid4(), mrp_id=uuid4())
+    rule = DistributionRule(cfo_id=uuid4(), budget_article_id=uuid4(), mrp_id=uuid4())
     session = MagicMock(spec=AsyncSession)
     session.merge = AsyncMock()
-    repository = SqlAlchemySavingsDistributionRuleRepository(session)
+    repository = SqlAlchemyDistributionRuleRepository(session)
 
     asyncio.run(repository.save(rule))
 
     session.merge.assert_awaited_once()
     model = session.merge.await_args.args[0]
-    assert isinstance(model, SavingsDistributionRuleModel)
+    assert isinstance(model, DistributionRuleModel)
     assert (model.id, model.cfo_id, model.budget_article_id, model.mrp_id) == (
         rule.id,
         rule.cfo_id,
@@ -203,18 +202,16 @@ def test_get_missing_cfo_returns_none() -> None:
 
 
 def test_delete_distribution_rule_targets_only_selected_rule() -> None:
-    rule = SavingsDistributionRule(cfo_id=uuid4(), budget_article_id=uuid4(), mrp_id=uuid4())
+    rule = DistributionRule(cfo_id=uuid4(), budget_article_id=uuid4(), mrp_id=uuid4())
     session = MagicMock(spec=AsyncSession)
     session.execute = AsyncMock()
-    repository = SqlAlchemySavingsDistributionRuleRepository(session)
+    repository = SqlAlchemyDistributionRuleRepository(session)
 
     asyncio.run(repository.delete(rule))
 
     session.execute.assert_awaited_once()
     statement = session.execute.await_args.args[0]
-    assert str(statement) == (
-        "DELETE FROM savings_distribution_rules WHERE savings_distribution_rules.id = :id_1"
-    )
+    assert str(statement) == ("DELETE FROM distribution_rules WHERE distribution_rules.id = :id_1")
     assert list(statement.compile().params.values()) == [rule.id]
     session.commit.assert_not_called()
 

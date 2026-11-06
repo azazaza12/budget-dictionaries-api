@@ -9,16 +9,16 @@ from sigma.modules.dictionaries.domain import (
     MRP,
     BudgetArticle,
     Category,
-    SavingsDistributionRule,
+    DistributionRule,
 )
-from sigma.modules.dictionaries.features.find_mrp_by_savings_distribution_rule import (
-    find_mrp_by_savings_distribution_rule,
+from sigma.modules.dictionaries.features.recommend_mrp import (
+    recommend_mrp,
 )
 from sigma.modules.dictionaries.repository import (
     BudgetArticleRepository,
     CFORepository,
+    DistributionRuleRepository,
     MRPRepository,
-    SavingsDistributionRuleRepository,
 )
 
 
@@ -39,15 +39,13 @@ def repositories(
     cfo_repository = MagicMock(spec=CFORepository)
     article_repository = MagicMock(spec=BudgetArticleRepository)
     mrp_repository = MagicMock(spec=MRPRepository)
-    rule_repository = MagicMock(spec=SavingsDistributionRuleRepository)
+    rule_repository = MagicMock(spec=DistributionRuleRepository)
     for repository, reference in zip(
         (cfo_repository, article_repository, mrp_repository), references, strict=True
     ):
         repository.get = AsyncMock(return_value=reference)
     rule_repository.find_by_pair = AsyncMock(
-        return_value=SavingsDistributionRule(
-            cfo_id=cfo.id, budget_article_id=article.id, mrp_id=mrp.id
-        )
+        return_value=DistributionRule(cfo_id=cfo.id, budget_article_id=article.id, mrp_id=mrp.id)
     )
     return cfo_repository, article_repository, mrp_repository, rule_repository
 
@@ -59,7 +57,7 @@ def test_find_mrp_returns_mrp_when_all_references_are_active(
     cfo, article, mrp = references
 
     result = asyncio.run(
-        find_mrp_by_savings_distribution_rule(
+        recommend_mrp(
             cfo.id,
             article.id,
             cfo_repository=repositories[0],
@@ -87,7 +85,7 @@ def test_find_mrp_returns_none_without_rule(
     repositories[3].find_by_pair.return_value = None
 
     result = asyncio.run(
-        find_mrp_by_savings_distribution_rule(
+        recommend_mrp(
             cfo.id,
             article.id,
             cfo_repository=repositories[0],
@@ -118,7 +116,7 @@ def test_find_mrp_returns_none_for_archived_or_missing_reference(
         references[reference_index].archive()
 
     result = asyncio.run(
-        find_mrp_by_savings_distribution_rule(
+        recommend_mrp(
             cfo.id,
             article.id,
             cfo_repository=repositories[0],
@@ -145,7 +143,7 @@ def test_find_mrp_returns_mrp_after_reference_is_restored(
     references[reference_index].archive()
 
     async def find() -> MRP | None:
-        return await find_mrp_by_savings_distribution_rule(
+        return await recommend_mrp(
             cfo.id,
             article.id,
             cfo_repository=repositories[0],

@@ -13,16 +13,16 @@ from sigma.modules.dictionaries.facade import (
     CFONotFoundError,
     DictionariesDomainError,
     DictionariesFeatureError,
+    DistributionRuleNotFoundError,
     DuplicateDictionaryNameError,
-    DuplicateSavingsDistributionRuleError,
+    DuplicateDistributionRuleError,
     InvalidDictionaryNameError,
     MRPNotFoundError,
-    SavingsDistributionRuleNotFoundError,
 )
 
 ERROR_STATUSES: dict[type[Exception], int] = {
-    SavingsDistributionRuleNotFoundError: status.HTTP_404_NOT_FOUND,
-    DuplicateSavingsDistributionRuleError: status.HTTP_409_CONFLICT,
+    DistributionRuleNotFoundError: status.HTTP_404_NOT_FOUND,
+    DuplicateDistributionRuleError: status.HTTP_409_CONFLICT,
     ArchivedCFOError: status.HTTP_409_CONFLICT,
     ArchivedBudgetArticleError: status.HTTP_409_CONFLICT,
     ArchivedMRPError: status.HTTP_409_CONFLICT,

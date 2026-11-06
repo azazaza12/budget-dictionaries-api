@@ -52,13 +52,13 @@ class CFOModel(Base):
     normalized_name: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
 
 
-class SavingsDistributionRuleModel(Base):
-    __tablename__ = "savings_distribution_rules"
+class DistributionRuleModel(Base):
+    __tablename__ = "distribution_rules"
     __table_args__ = (
         UniqueConstraint(
             "cfo_id",
             "budget_article_id",
-            name="uq_savings_distribution_rules_cfo_article",
+            name="uq_distribution_rules_cfo_article",
         ),
     )
 

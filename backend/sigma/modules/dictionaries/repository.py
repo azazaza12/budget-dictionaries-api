@@ -5,13 +5,13 @@ from uuid import UUID
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .domain import CFO, MRP, BudgetArticle, Category, SavingsDistributionRule
+from .domain import CFO, MRP, BudgetArticle, Category, DistributionRule
 from .models import (
     BudgetArticleModel,
     CategoryModel,
     CFOModel,
+    DistributionRuleModel,
     MRPModel,
-    SavingsDistributionRuleModel,
 )
 
 
@@ -82,28 +82,28 @@ class CFORepository(Protocol):
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class SavingsDistributionRuleDetails:
-    rule: SavingsDistributionRule
+class DistributionRuleDetails:
+    rule: DistributionRule
     cfo: CFO
     budget_article: BudgetArticle
     category: Category
     mrp: MRP
 
 
-class SavingsDistributionRuleRepository(Protocol):
-    async def get(self, rule_id: UUID) -> SavingsDistributionRule | None: ...
+class DistributionRuleRepository(Protocol):
+    async def get(self, rule_id: UUID) -> DistributionRule | None: ...
 
-    async def list(self) -> list[SavingsDistributionRuleDetails]: ...
+    async def list(self) -> list[DistributionRuleDetails]: ...
 
-    async def add(self, rule: SavingsDistributionRule) -> None: ...
+    async def add(self, rule: DistributionRule) -> None: ...
 
     async def find_by_pair(
         self, cfo_id: UUID, budget_article_id: UUID
-    ) -> SavingsDistributionRule | None: ...
+    ) -> DistributionRule | None: ...
 
-    async def save(self, rule: SavingsDistributionRule) -> None: ...
+    async def save(self, rule: DistributionRule) -> None: ...
 
-    async def delete(self, rule: SavingsDistributionRule) -> None: ...
+    async def delete(self, rule: DistributionRule) -> None: ...
 
 
 class SqlAlchemyCategoryRepository:
@@ -319,13 +319,13 @@ class SqlAlchemyCFORepository:
         return bool(await self._session.scalar(statement))
 
 
-class SqlAlchemySavingsDistributionRuleRepository:
+class SqlAlchemyDistributionRuleRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
     @staticmethod
-    def _to_domain(model: SavingsDistributionRuleModel) -> SavingsDistributionRule:
-        return SavingsDistributionRule(
+    def _to_domain(model: DistributionRuleModel) -> DistributionRule:
+        return DistributionRule(
             id=model.id,
             cfo_id=model.cfo_id,
             budget_article_id=model.budget_article_id,
@@ -333,71 +333,67 @@ class SqlAlchemySavingsDistributionRuleRepository:
         )
 
     @staticmethod
-    def _to_model(rule: SavingsDistributionRule) -> SavingsDistributionRuleModel:
-        return SavingsDistributionRuleModel(
+    def _to_model(rule: DistributionRule) -> DistributionRuleModel:
+        return DistributionRuleModel(
             id=rule.id,
             cfo_id=rule.cfo_id,
             budget_article_id=rule.budget_article_id,
             mrp_id=rule.mrp_id,
         )
 
-    async def get(self, rule_id: UUID) -> SavingsDistributionRule | None:
-        model = await self._session.get(SavingsDistributionRuleModel, rule_id)
+    async def get(self, rule_id: UUID) -> DistributionRule | None:
+        model = await self._session.get(DistributionRuleModel, rule_id)
         if model is None:
             return None
         return self._to_domain(model)
 
-    async def add(self, rule: SavingsDistributionRule) -> None:
+    async def add(self, rule: DistributionRule) -> None:
         model = self._to_model(rule)
         self._session.add(model)
 
-    async def find_by_pair(
-        self, cfo_id: UUID, budget_article_id: UUID
-    ) -> SavingsDistributionRule | None:
-        statement = select(SavingsDistributionRuleModel).where(
-            SavingsDistributionRuleModel.cfo_id == cfo_id,
-            SavingsDistributionRuleModel.budget_article_id == budget_article_id,
+    async def find_by_pair(self, cfo_id: UUID, budget_article_id: UUID) -> DistributionRule | None:
+        statement = select(DistributionRuleModel).where(
+            DistributionRuleModel.cfo_id == cfo_id,
+            DistributionRuleModel.budget_article_id == budget_article_id,
         )
         model = await self._session.scalar(statement)
         if model is None:
             return None
         return self._to_domain(model)
 
-    async def save(self, rule: SavingsDistributionRule) -> None:
+    async def save(self, rule: DistributionRule) -> None:
         await self._session.merge(self._to_model(rule))
 
-    async def delete(self, rule: SavingsDistributionRule) -> None:
-        statement = delete(SavingsDistributionRuleModel).where(
-            SavingsDistributionRuleModel.id == rule.id
-        )
+    async def delete(self, rule: DistributionRule) -> None:
+        statement = delete(DistributionRuleModel).where(DistributionRuleModel.id == rule.id)
         await self._session.execute(statement)
 
-    async def list(self) -> list[SavingsDistributionRuleDetails]:
+    async def list(self) -> list[DistributionRuleDetails]:
         statement = (
             select(
-                SavingsDistributionRuleModel,
+                DistributionRuleModel,
                 CFOModel,
                 BudgetArticleModel,
                 CategoryModel,
                 MRPModel,
             )
-            .select_from(SavingsDistributionRuleModel)
-            .join(CFOModel, SavingsDistributionRuleModel.cfo_id == CFOModel.id)
+            .select_from(DistributionRuleModel)
+            .join(CFOModel, DistributionRuleModel.cfo_id == CFOModel.id)
             .join(
                 BudgetArticleModel,
-                SavingsDistributionRuleModel.budget_article_id == BudgetArticleModel.id,
+                DistributionRuleModel.budget_article_id == BudgetArticleModel.id,
             )
             .join(CategoryModel, BudgetArticleModel.category_id == CategoryModel.id)
-            .join(MRPModel, SavingsDistributionRuleModel.mrp_id == MRPModel.id)
+            .join(MRPModel, DistributionRuleModel.mrp_id == MRPModel.id)
             .order_by(
                 CFOModel.normalized_name,
                 BudgetArticleModel.normalized_name,
-                SavingsDistributionRuleModel.id,
+                DistributionRuleModel.id,
             )
         )
         rows = (await self._session.execute(statement)).all()
         return [
-            SavingsDistributionRuleDetails(
+            DistributionRuleDetails(
                 rule=self._to_domain(rule),
                 cfo=SqlAlchemyCFORepository._to_domain(cfo),
                 budget_article=SqlAlchemyBudgetArticleRepository._to_domain(article),

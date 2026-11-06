@@ -1,23 +1,23 @@
 from uuid import UUID
 
-from sigma.modules.dictionaries.domain import SavingsDistributionRule
+from sigma.modules.dictionaries.domain import DistributionRule
 from sigma.modules.dictionaries.repository import (
     BudgetArticleRepository,
     CFORepository,
+    DistributionRuleRepository,
     MRPRepository,
-    SavingsDistributionRuleRepository,
 )
 
 from .errors import (
     BudgetArticleNotFoundError,
     CFONotFoundError,
-    DuplicateSavingsDistributionRuleError,
+    DistributionRuleNotFoundError,
+    DuplicateDistributionRuleError,
     MRPNotFoundError,
-    SavingsDistributionRuleNotFoundError,
 )
 
 
-async def update_savings_distribution_rule(
+async def update_distribution_rule(
     rule_id: UUID,
     cfo_id: UUID,
     budget_article_id: UUID,
@@ -26,11 +26,11 @@ async def update_savings_distribution_rule(
     cfo_repository: CFORepository,
     article_repository: BudgetArticleRepository,
     mrp_repository: MRPRepository,
-    rule_repository: SavingsDistributionRuleRepository,
-) -> SavingsDistributionRule:
+    rule_repository: DistributionRuleRepository,
+) -> DistributionRule:
     rule = await rule_repository.get(rule_id)
     if rule is None:
-        raise SavingsDistributionRuleNotFoundError(rule_id)
+        raise DistributionRuleNotFoundError(rule_id)
 
     cfo = await cfo_repository.get(cfo_id)
     if cfo is None:
@@ -46,7 +46,7 @@ async def update_savings_distribution_rule(
 
     existing = await rule_repository.find_by_pair(cfo_id, budget_article_id)
     if existing is not None and existing.id != rule.id:
-        raise DuplicateSavingsDistributionRuleError(existing.id)
+        raise DuplicateDistributionRuleError(existing.id)
 
     rule.update(cfo, article, mrp)
     await rule_repository.save(rule)

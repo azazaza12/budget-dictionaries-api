@@ -5,8 +5,8 @@ from sigma.modules.dictionaries.models import (
     BudgetArticleModel,
     CategoryModel,
     CFOModel,
+    DistributionRuleModel,
     MRPModel,
-    SavingsDistributionRuleModel,
 )
 
 
@@ -96,25 +96,25 @@ def test_budget_article_category_foreign_key_restricts_deletion() -> None:
     assert foreign_key.ondelete == "RESTRICT"
 
 
-def test_savings_distribution_rule_model_schema() -> None:
-    table = SavingsDistributionRuleModel.__table__
+def test_distribution_rule_model_schema() -> None:
+    table = DistributionRuleModel.__table__
     assert isinstance(table, Table)
 
-    assert SavingsDistributionRuleModel.__tablename__ == "savings_distribution_rules"
+    assert DistributionRuleModel.__tablename__ == "distribution_rules"
     assert set(table.columns.keys()) == {"id", "cfo_id", "budget_article_id", "mrp_id"}
     assert list(table.primary_key.columns.keys()) == ["id"]
     assert all(not column.nullable for column in table.columns)
 
 
-def test_savings_distribution_rule_pair_is_unique() -> None:
-    table = SavingsDistributionRuleModel.__table__
+def test_distribution_rule_pair_is_unique() -> None:
+    table = DistributionRuleModel.__table__
     assert isinstance(table, Table)
     constraints = [
         constraint for constraint in table.constraints if isinstance(constraint, UniqueConstraint)
     ]
 
     assert len(constraints) == 1
-    assert constraints[0].name == "uq_savings_distribution_rules_cfo_article"
+    assert constraints[0].name == "uq_distribution_rules_cfo_article"
     assert list(constraints[0].columns.keys()) == ["cfo_id", "budget_article_id"]
 
 
@@ -122,10 +122,8 @@ def test_savings_distribution_rule_pair_is_unique() -> None:
     ("column_name", "target"),
     [("cfo_id", "cfo.id"), ("budget_article_id", "budget_articles.id"), ("mrp_id", "mrp.id")],
 )
-def test_savings_distribution_rule_foreign_keys_restrict_deletion(
-    column_name: str, target: str
-) -> None:
-    table = SavingsDistributionRuleModel.__table__
+def test_distribution_rule_foreign_keys_restrict_deletion(column_name: str, target: str) -> None:
+    table = DistributionRuleModel.__table__
     assert isinstance(table, Table)
     foreign_keys = table.c[column_name].foreign_keys
 

@@ -4,10 +4,10 @@ from fastapi import APIRouter, Depends, status
 
 from .dependencies import DictionariesFacadeDependency, require_dictionaries_admin
 from .schemas import (
+    DistributionRuleDetailsView,
+    DistributionRuleInput,
+    DistributionRuleView,
     MRPView,
-    SavingsDistributionRuleDetailsView,
-    SavingsDistributionRuleInput,
-    SavingsDistributionRuleView,
 )
 
 router = APIRouter(
@@ -22,7 +22,7 @@ async def recommend_mrp(
     budget_article_id: UUID,
     dictionaries: DictionariesFacadeDependency,
 ) -> MRPView | None:
-    mrp = await dictionaries.find_mrp_by_savings_distribution_rule(cfo_id, budget_article_id)
+    mrp = await dictionaries.recommend_mrp(cfo_id, budget_article_id)
     if mrp is None:
         return None
 
@@ -30,43 +30,43 @@ async def recommend_mrp(
 
 
 @router.get("")
-async def list_savings_distribution_rules(
+async def list_distribution_rules(
     dictionaries: DictionariesFacadeDependency,
-) -> list[SavingsDistributionRuleDetailsView]:
-    items = await dictionaries.list_savings_distribution_rules()
-    return [SavingsDistributionRuleDetailsView.model_validate(item) for item in items]
+) -> list[DistributionRuleDetailsView]:
+    items = await dictionaries.list_distribution_rules()
+    return [DistributionRuleDetailsView.model_validate(item) for item in items]
 
 
 @router.post(
     "", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_dictionaries_admin)]
 )
-async def create_savings_distribution_rule(
-    data: SavingsDistributionRuleInput, dictionaries: DictionariesFacadeDependency
-) -> SavingsDistributionRuleView:
-    rule = await dictionaries.create_savings_distribution_rule(
+async def create_distribution_rule(
+    data: DistributionRuleInput, dictionaries: DictionariesFacadeDependency
+) -> DistributionRuleView:
+    rule = await dictionaries.create_distribution_rule(
         data.cfo_id, data.budget_article_id, data.mrp_id
     )
-    return SavingsDistributionRuleView.model_validate(rule)
+    return DistributionRuleView.model_validate(rule)
 
 
 @router.get("/{rule_id}")
-async def get_savings_distribution_rule(
+async def get_distribution_rule(
     rule_id: UUID, dictionaries: DictionariesFacadeDependency
-) -> SavingsDistributionRuleView:
-    rule = await dictionaries.get_savings_distribution_rule(rule_id)
-    return SavingsDistributionRuleView.model_validate(rule)
+) -> DistributionRuleView:
+    rule = await dictionaries.get_distribution_rule(rule_id)
+    return DistributionRuleView.model_validate(rule)
 
 
 @router.put("/{rule_id}", dependencies=[Depends(require_dictionaries_admin)])
-async def update_savings_distribution_rule(
+async def update_distribution_rule(
     rule_id: UUID,
-    data: SavingsDistributionRuleInput,
+    data: DistributionRuleInput,
     dictionaries: DictionariesFacadeDependency,
-) -> SavingsDistributionRuleView:
-    rule = await dictionaries.update_savings_distribution_rule(
+) -> DistributionRuleView:
+    rule = await dictionaries.update_distribution_rule(
         rule_id, data.cfo_id, data.budget_article_id, data.mrp_id
     )
-    return SavingsDistributionRuleView.model_validate(rule)
+    return DistributionRuleView.model_validate(rule)
 
 
 @router.delete(
@@ -74,7 +74,7 @@ async def update_savings_distribution_rule(
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[Depends(require_dictionaries_admin)],
 )
-async def delete_savings_distribution_rule(
+async def delete_distribution_rule(
     rule_id: UUID, dictionaries: DictionariesFacadeDependency
 ) -> None:
-    await dictionaries.delete_savings_distribution_rule(rule_id)
+    await dictionaries.delete_distribution_rule(rule_id)

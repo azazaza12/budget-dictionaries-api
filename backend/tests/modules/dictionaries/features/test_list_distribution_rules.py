@@ -8,14 +8,14 @@ from sigma.modules.dictionaries.domain import (
     MRP,
     BudgetArticle,
     Category,
-    SavingsDistributionRule,
+    DistributionRule,
 )
-from sigma.modules.dictionaries.features.list_savings_distribution_rules import (
-    list_savings_distribution_rules,
+from sigma.modules.dictionaries.features.list_distribution_rules import (
+    list_distribution_rules,
 )
 from sigma.modules.dictionaries.repository import (
-    SavingsDistributionRuleDetails,
-    SavingsDistributionRuleRepository,
+    DistributionRuleDetails,
+    DistributionRuleRepository,
 )
 
 
@@ -29,8 +29,8 @@ def test_list_rules_returns_repository_items_without_changes(empty: bool) -> Non
         []
         if empty
         else [
-            SavingsDistributionRuleDetails(
-                rule=SavingsDistributionRule(
+            DistributionRuleDetails(
+                rule=DistributionRule(
                     cfo_id=cfo.id,
                     budget_article_id=article.id,
                     mrp_id=mrp.id,
@@ -42,10 +42,10 @@ def test_list_rules_returns_repository_items_without_changes(empty: bool) -> Non
             )
         ]
     )
-    repository = MagicMock(spec=SavingsDistributionRuleRepository)
+    repository = MagicMock(spec=DistributionRuleRepository)
     repository.list = AsyncMock(return_value=items)
 
-    result = asyncio.run(list_savings_distribution_rules(repository))
+    result = asyncio.run(list_distribution_rules(repository))
 
     assert result is items
     repository.list.assert_awaited_once_with()

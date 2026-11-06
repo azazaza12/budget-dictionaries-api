@@ -4,19 +4,19 @@ from sigma.modules.dictionaries.domain import MRP
 from sigma.modules.dictionaries.repository import (
     BudgetArticleRepository,
     CFORepository,
+    DistributionRuleRepository,
     MRPRepository,
-    SavingsDistributionRuleRepository,
 )
 
 
-async def find_mrp_by_savings_distribution_rule(
+async def recommend_mrp(
     cfo_id: UUID,
     budget_article_id: UUID,
     *,
     cfo_repository: CFORepository,
     article_repository: BudgetArticleRepository,
     mrp_repository: MRPRepository,
-    rule_repository: SavingsDistributionRuleRepository,
+    rule_repository: DistributionRuleRepository,
 ) -> MRP | None:
     rule = await rule_repository.find_by_pair(cfo_id, budget_article_id)
     if rule is None:

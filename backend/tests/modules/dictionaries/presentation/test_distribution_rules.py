@@ -16,9 +16,9 @@ from sigma.modules.dictionaries.facade import (
     BudgetArticleNotFoundError,
     CFONotFoundError,
     DictionariesFacade,
-    DuplicateSavingsDistributionRuleError,
+    DistributionRuleNotFoundError,
+    DuplicateDistributionRuleError,
     MRPNotFoundError,
-    SavingsDistributionRuleNotFoundError,
 )
 from sigma.modules.dictionaries.presentation.dependencies import (
     get_dictionaries_facade,
@@ -54,7 +54,7 @@ def test_recommendation_returns_mrp_view_without_admin_access(
 ) -> None:
     rules_api.admin_check.side_effect = HTTPException(status_code=403, detail="Forbidden")
     cfo_id, article_id, mrp_id = uuid4(), uuid4(), uuid4()
-    rules_api.dictionaries.find_mrp_by_savings_distribution_rule = AsyncMock(
+    rules_api.dictionaries.recommend_mrp = AsyncMock(
         return_value=SimpleNamespace(
             id=mrp_id, name="Иванов", is_archived=False, normalized_name="иванов"
         )
@@ -67,15 +67,13 @@ def test_recommendation_returns_mrp_view_without_admin_access(
 
     assert response.status_code == 200
     assert response.json() == {"id": str(mrp_id), "name": "Иванов", "is_archived": False}
-    rules_api.dictionaries.find_mrp_by_savings_distribution_rule.assert_awaited_once_with(
-        cfo_id, article_id
-    )
+    rules_api.dictionaries.recommend_mrp.assert_awaited_once_with(cfo_id, article_id)
     rules_api.admin_check.assert_not_called()
 
 
 def test_recommendation_returns_null_when_no_match(rules_api: DistributionRulesApi) -> None:
     cfo_id, article_id = uuid4(), uuid4()
-    rules_api.dictionaries.find_mrp_by_savings_distribution_rule = AsyncMock(return_value=None)
+    rules_api.dictionaries.recommend_mrp = AsyncMock(return_value=None)
 
     response = rules_api.client.get(
         "/dictionaries/savings-distribution-rules/recommendation",
@@ -84,9 +82,7 @@ def test_recommendation_returns_null_when_no_match(rules_api: DistributionRulesA
 
     assert response.status_code == 200
     assert response.json() is None
-    rules_api.dictionaries.find_mrp_by_savings_distribution_rule.assert_awaited_once_with(
-        cfo_id, article_id
-    )
+    rules_api.dictionaries.recommend_mrp.assert_awaited_once_with(cfo_id, article_id)
     rules_api.admin_check.assert_not_called()
 
 
@@ -107,7 +103,7 @@ def test_recommendation_rejects_missing_or_invalid_query(
 
     assert response.status_code == 422
     assert response.json()["detail"][0]["loc"] == ["query", parameter]
-    rules_api.dictionaries.find_mrp_by_savings_distribution_rule.assert_not_called()
+    rules_api.dictionaries.recommend_mrp.assert_not_called()
 
 
 def test_recommendation_openapi_describes_required_uuid_query_and_nullable_view(
@@ -151,7 +147,7 @@ def test_rule_write_returns_view(
 ) -> None:
     operation = AsyncMock(return_value=rule)
     action = "update" if update else "create"
-    setattr(rules_api.dictionaries, f"{action}_savings_distribution_rule", operation)
+    setattr(rules_api.dictionaries, f"{action}_distribution_rule", operation)
     path = "/dictionaries/savings-distribution-rules"
 
     response = rules_api.client.request(
@@ -168,13 +164,13 @@ def test_rule_write_returns_view(
 
 
 def test_get_rule_returns_view(rule: SimpleNamespace, rules_api: DistributionRulesApi) -> None:
-    rules_api.dictionaries.get_savings_distribution_rule = AsyncMock(return_value=rule)
+    rules_api.dictionaries.get_distribution_rule = AsyncMock(return_value=rule)
 
     response = rules_api.client.get(f"/dictionaries/savings-distribution-rules/{rule.id}")
 
     assert response.status_code == 200
     assert response.json() == {"id": str(rule.id), **_rule_input(rule)}
-    rules_api.dictionaries.get_savings_distribution_rule.assert_awaited_once_with(rule.id)
+    rules_api.dictionaries.get_distribution_rule.assert_awaited_once_with(rule.id)
     rules_api.admin_check.assert_not_called()
 
 
@@ -199,7 +195,7 @@ def test_list_rules_returns_nested_views(
         category=SimpleNamespace(**category),
         mrp=SimpleNamespace(**mrp),
     )
-    rules_api.dictionaries.list_savings_distribution_rules = AsyncMock(return_value=[item])
+    rules_api.dictionaries.list_distribution_rules = AsyncMock(return_value=[item])
 
     response = rules_api.client.get("/dictionaries/savings-distribution-rules")
 
@@ -213,30 +209,30 @@ def test_list_rules_returns_nested_views(
             "mrp": mrp,
         }
     ]
-    rules_api.dictionaries.list_savings_distribution_rules.assert_awaited_once_with()
+    rules_api.dictionaries.list_distribution_rules.assert_awaited_once_with()
     rules_api.admin_check.assert_not_called()
 
 
 def test_list_rules_returns_empty_list(rules_api: DistributionRulesApi) -> None:
-    rules_api.dictionaries.list_savings_distribution_rules = AsyncMock(return_value=[])
+    rules_api.dictionaries.list_distribution_rules = AsyncMock(return_value=[])
 
     response = rules_api.client.get("/dictionaries/savings-distribution-rules")
 
     assert response.status_code == 200
     assert response.json() == []
-    rules_api.dictionaries.list_savings_distribution_rules.assert_awaited_once_with()
+    rules_api.dictionaries.list_distribution_rules.assert_awaited_once_with()
 
 
 def test_delete_rule_returns_no_content(
     rule: SimpleNamespace, rules_api: DistributionRulesApi
 ) -> None:
-    rules_api.dictionaries.delete_savings_distribution_rule = AsyncMock(return_value=None)
+    rules_api.dictionaries.delete_distribution_rule = AsyncMock(return_value=None)
 
     response = rules_api.client.delete(f"/dictionaries/savings-distribution-rules/{rule.id}")
 
     assert response.status_code == 204
     assert response.content == b""
-    rules_api.dictionaries.delete_savings_distribution_rule.assert_awaited_once_with(rule.id)
+    rules_api.dictionaries.delete_distribution_rule.assert_awaited_once_with(rule.id)
     rules_api.admin_check.assert_called_once_with()
 
 
@@ -246,8 +242,8 @@ def test_delete_rule_returns_no_content(
 def test_missing_rule_returns_not_found(
     method: str, action: str, rule: SimpleNamespace, rules_api: DistributionRulesApi
 ) -> None:
-    operation = AsyncMock(side_effect=SavingsDistributionRuleNotFoundError(rule.id))
-    setattr(rules_api.dictionaries, f"{action}_savings_distribution_rule", operation)
+    operation = AsyncMock(side_effect=DistributionRuleNotFoundError(rule.id))
+    setattr(rules_api.dictionaries, f"{action}_distribution_rule", operation)
 
     response = rules_api.client.request(
         method,
@@ -273,7 +269,7 @@ def test_missing_rule_returns_not_found(
         (ArchivedBudgetArticleError, "archived_budget_article", "article_id", 409),
         (ArchivedMRPError, "archived_mrp", "mrp_id", 409),
         (
-            DuplicateSavingsDistributionRuleError,
+            DuplicateDistributionRuleError,
             "duplicate_savings_distribution_rule",
             "rule_id",
             409,
@@ -293,7 +289,7 @@ def test_rule_write_maps_reference_and_duplicate_errors(
     reference_id = uuid4()
     operation = AsyncMock(side_effect=error_type(reference_id))
     action = "update" if update else "create"
-    setattr(rules_api.dictionaries, f"{action}_savings_distribution_rule", operation)
+    setattr(rules_api.dictionaries, f"{action}_distribution_rule", operation)
     path = "/dictionaries/savings-distribution-rules"
 
     response = rules_api.client.request(
@@ -328,8 +324,8 @@ def test_rule_write_rejects_invalid_body(
     )
 
     assert response.status_code == 422
-    rules_api.dictionaries.create_savings_distribution_rule.assert_not_called()
-    rules_api.dictionaries.update_savings_distribution_rule.assert_not_called()
+    rules_api.dictionaries.create_distribution_rule.assert_not_called()
+    rules_api.dictionaries.update_distribution_rule.assert_not_called()
 
 
 @pytest.mark.parametrize("update", [False, True])
@@ -345,8 +341,8 @@ def test_rule_write_rejects_extra_fields(
     )
 
     assert response.status_code == 422
-    rules_api.dictionaries.create_savings_distribution_rule.assert_not_called()
-    rules_api.dictionaries.update_savings_distribution_rule.assert_not_called()
+    rules_api.dictionaries.create_distribution_rule.assert_not_called()
+    rules_api.dictionaries.update_distribution_rule.assert_not_called()
 
 
 @pytest.mark.parametrize("method", ["GET", "PUT", "DELETE"])
@@ -360,9 +356,9 @@ def test_rule_rejects_invalid_path_id(
     )
 
     assert response.status_code == 422
-    rules_api.dictionaries.get_savings_distribution_rule.assert_not_called()
-    rules_api.dictionaries.update_savings_distribution_rule.assert_not_called()
-    rules_api.dictionaries.delete_savings_distribution_rule.assert_not_called()
+    rules_api.dictionaries.get_distribution_rule.assert_not_called()
+    rules_api.dictionaries.update_distribution_rule.assert_not_called()
+    rules_api.dictionaries.delete_distribution_rule.assert_not_called()
 
 
 @pytest.mark.parametrize("method", ["POST", "PUT", "DELETE"])
@@ -377,6 +373,6 @@ def test_rule_write_requires_admin(
     )
 
     assert response.status_code == 403
-    rules_api.dictionaries.create_savings_distribution_rule.assert_not_called()
-    rules_api.dictionaries.update_savings_distribution_rule.assert_not_called()
-    rules_api.dictionaries.delete_savings_distribution_rule.assert_not_called()
+    rules_api.dictionaries.create_distribution_rule.assert_not_called()
+    rules_api.dictionaries.update_distribution_rule.assert_not_called()
+    rules_api.dictionaries.delete_distribution_rule.assert_not_called()

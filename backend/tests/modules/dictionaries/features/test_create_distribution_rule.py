@@ -12,23 +12,23 @@ from sigma.modules.dictionaries.domain import (
     ArchivedMRPError,
     BudgetArticle,
     DictionariesDomainError,
-    SavingsDistributionRule,
+    DistributionRule,
 )
-from sigma.modules.dictionaries.features.create_savings_distribution_rule import (
-    create_savings_distribution_rule,
+from sigma.modules.dictionaries.features.create_distribution_rule import (
+    create_distribution_rule,
 )
 from sigma.modules.dictionaries.features.errors import (
     BudgetArticleNotFoundError,
     CFONotFoundError,
     DictionariesFeatureError,
-    DuplicateSavingsDistributionRuleError,
+    DuplicateDistributionRuleError,
     MRPNotFoundError,
 )
 from sigma.modules.dictionaries.repository import (
     BudgetArticleRepository,
     CFORepository,
+    DistributionRuleRepository,
     MRPRepository,
-    SavingsDistributionRuleRepository,
 )
 
 
@@ -48,7 +48,7 @@ def repositories(
     cfo_repository = MagicMock(spec=CFORepository)
     article_repository = MagicMock(spec=BudgetArticleRepository)
     mrp_repository = MagicMock(spec=MRPRepository)
-    rule_repository = MagicMock(spec=SavingsDistributionRuleRepository)
+    rule_repository = MagicMock(spec=DistributionRuleRepository)
     for repository, reference in zip(
         (cfo_repository, article_repository, mrp_repository), references, strict=True
     ):
@@ -65,7 +65,7 @@ def test_create_rule_saves_rule_with_selected_references(
     cfo, article, mrp = references
 
     rule = asyncio.run(
-        create_savings_distribution_rule(
+        create_distribution_rule(
             cfo.id,
             article.id,
             mrp.id,
@@ -98,7 +98,7 @@ def test_create_rule_rejects_missing_reference(
 
     with pytest.raises(error_type, match=str(references[reference_index].id)):
         asyncio.run(
-            create_savings_distribution_rule(
+            create_distribution_rule(
                 cfo.id,
                 article.id,
                 mrp.id,
@@ -128,7 +128,7 @@ def test_create_rule_rejects_archived_reference(
 
     with pytest.raises(error_type, match=str(references[reference_index].id)):
         asyncio.run(
-            create_savings_distribution_rule(
+            create_distribution_rule(
                 cfo.id,
                 article.id,
                 mrp.id,
@@ -151,14 +151,12 @@ def test_create_rule_rejects_duplicate_pair_with_existing_rule_id(
 ) -> None:
     cfo, article, mrp = references
     existing_mrp_id = mrp.id if same_mrp else uuid4()
-    existing = SavingsDistributionRule(
-        cfo_id=cfo.id, budget_article_id=article.id, mrp_id=existing_mrp_id
-    )
+    existing = DistributionRule(cfo_id=cfo.id, budget_article_id=article.id, mrp_id=existing_mrp_id)
     repositories[3].find_by_pair.return_value = existing
 
-    with pytest.raises(DuplicateSavingsDistributionRuleError) as error:
+    with pytest.raises(DuplicateDistributionRuleError) as error:
         asyncio.run(
-            create_savings_distribution_rule(
+            create_distribution_rule(
                 cfo.id,
                 article.id,
                 mrp.id,
