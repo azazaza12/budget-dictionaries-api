@@ -56,6 +56,9 @@ def test_application_exposes_all_dictionary_routes(dictionaries_api: Dictionarie
         "/dictionaries/mrps/{mrp_id}": {"put"},
         "/dictionaries/mrps/{mrp_id}/archive": {"post"},
         "/dictionaries/mrps/{mrp_id}/restore": {"post"},
+        "/dictionaries/savings-distribution-rules/recommendation": {"get"},
+        "/dictionaries/savings-distribution-rules": {"get", "post"},
+        "/dictionaries/savings-distribution-rules/{rule_id}": {"get", "put", "delete"},
     }
     for path, methods in expected_routes.items():
         assert set(paths[path]) == methods

@@ -3,7 +3,10 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
 from sigma.modules.dictionaries.facade import (
+    ArchivedBudgetArticleError,
     ArchivedCategoryError,
+    ArchivedCFOError,
+    ArchivedMRPError,
     ArticleCategoryMismatchError,
     BudgetArticleNotFoundError,
     CategoryNotFoundError,
@@ -11,11 +14,18 @@ from sigma.modules.dictionaries.facade import (
     DictionariesDomainError,
     DictionariesFeatureError,
     DuplicateDictionaryNameError,
+    DuplicateSavingsDistributionRuleError,
     InvalidDictionaryNameError,
     MRPNotFoundError,
+    SavingsDistributionRuleNotFoundError,
 )
 
 ERROR_STATUSES: dict[type[Exception], int] = {
+    SavingsDistributionRuleNotFoundError: status.HTTP_404_NOT_FOUND,
+    DuplicateSavingsDistributionRuleError: status.HTTP_409_CONFLICT,
+    ArchivedCFOError: status.HTTP_409_CONFLICT,
+    ArchivedBudgetArticleError: status.HTTP_409_CONFLICT,
+    ArchivedMRPError: status.HTTP_409_CONFLICT,
     MRPNotFoundError: status.HTTP_404_NOT_FOUND,
     CFONotFoundError: status.HTTP_404_NOT_FOUND,
     CategoryNotFoundError: status.HTTP_404_NOT_FOUND,
