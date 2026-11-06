@@ -1,5 +1,6 @@
 import asyncio
 from collections.abc import Mapping
+from types import TracebackType
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
@@ -9,17 +10,26 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sigma.modules.dictionaries import facade as facade_module
-from sigma.modules.dictionaries.domain import CFO, MRP, BudgetArticle, Category
+from sigma.modules.dictionaries.domain import (
+    CFO,
+    MRP,
+    BudgetArticle,
+    Category,
+    SavingsDistributionRule,
+)
 from sigma.modules.dictionaries.facade import (
     DictionariesFacade,
     DuplicateDictionaryNameError,
     MRPNotFoundError,
+    SavingsDistributionRuleNotFoundError,
 )
 from sigma.modules.dictionaries.repository import (
+    SavingsDistributionRuleListItem,
     SqlAlchemyBudgetArticleRepository,
     SqlAlchemyCategoryRepository,
     SqlAlchemyCFORepository,
     SqlAlchemyMRPRepository,
+    SqlAlchemySavingsDistributionRuleRepository,
 )
 
 
@@ -62,7 +72,10 @@ def _awaited_call(mock: AsyncMock) -> tuple[tuple[object, ...], Mapping[str, obj
 
 def test_facade_exports_public_errors_without_domain_entities() -> None:
     assert set(facade_module.__all__) == {
+        "ArchivedBudgetArticleError",
+        "ArchivedCFOError",
         "ArchivedCategoryError",
+        "ArchivedMRPError",
         "ArticleCategoryMismatchError",
         "BudgetArticleNotFoundError",
         "CategoryNotFoundError",
@@ -71,8 +84,10 @@ def test_facade_exports_public_errors_without_domain_entities() -> None:
         "DictionariesFacade",
         "DictionariesFeatureError",
         "DuplicateDictionaryNameError",
+        "DuplicateSavingsDistributionRuleError",
         "InvalidDictionaryNameError",
         "MRPNotFoundError",
+        "SavingsDistributionRuleNotFoundError",
     }
 
 
@@ -88,6 +103,9 @@ def test_facade_builds_repositories_with_same_session() -> None:
         ) as article_repository,
         patch("sigma.modules.dictionaries.facade.SqlAlchemyMRPRepository") as mrp_repository,
         patch("sigma.modules.dictionaries.facade.SqlAlchemyCFORepository") as cfo_repository,
+        patch(
+            "sigma.modules.dictionaries.facade.SqlAlchemySavingsDistributionRuleRepository"
+        ) as rule_repository,
     ):
         DictionariesFacade(session)
 
@@ -95,6 +113,210 @@ def test_facade_builds_repositories_with_same_session() -> None:
     article_repository.assert_called_once_with(session)
     mrp_repository.assert_called_once_with(session)
     cfo_repository.assert_called_once_with(session)
+    rule_repository.assert_called_once_with(session)
+
+
+def test_create_distribution_rule_passes_repositories_in_transaction() -> None:
+    session, transaction = _session_with_transaction()
+    rule = SavingsDistributionRule(cfo_id=uuid4(), budget_article_id=uuid4(), mrp_id=uuid4())
+    feature = AsyncMock(return_value=rule)
+
+    with patch(
+        "sigma.modules.dictionaries.facade.create_savings_distribution_rule_feature", feature
+    ):
+        result = asyncio.run(
+            DictionariesFacade(session).create_savings_distribution_rule(
+                rule.cfo_id, rule.budget_article_id, rule.mrp_id
+            )
+        )
+
+    assert result is rule
+    feature.assert_awaited_once()
+    args, kwargs = _awaited_call(feature)
+    assert args == (rule.cfo_id, rule.budget_article_id, rule.mrp_id)
+    assert set(kwargs) == {
+        "cfo_repository",
+        "article_repository",
+        "mrp_repository",
+        "rule_repository",
+    }
+    assert isinstance(kwargs["cfo_repository"], SqlAlchemyCFORepository)
+    assert isinstance(kwargs["article_repository"], SqlAlchemyBudgetArticleRepository)
+    assert isinstance(kwargs["mrp_repository"], SqlAlchemyMRPRepository)
+    assert isinstance(kwargs["rule_repository"], SqlAlchemySavingsDistributionRuleRepository)
+    _assert_successful_transaction(session, transaction)
+
+
+def test_update_distribution_rule_passes_repositories_in_transaction() -> None:
+    session, transaction = _session_with_transaction()
+    rule = SavingsDistributionRule(cfo_id=uuid4(), budget_article_id=uuid4(), mrp_id=uuid4())
+    feature = AsyncMock(return_value=rule)
+
+    with patch(
+        "sigma.modules.dictionaries.facade.update_savings_distribution_rule_feature", feature
+    ):
+        result = asyncio.run(
+            DictionariesFacade(session).update_savings_distribution_rule(
+                rule.id, rule.cfo_id, rule.budget_article_id, rule.mrp_id
+            )
+        )
+
+    assert result is rule
+    feature.assert_awaited_once()
+    args, kwargs = _awaited_call(feature)
+    assert args == (rule.id, rule.cfo_id, rule.budget_article_id, rule.mrp_id)
+    assert set(kwargs) == {
+        "cfo_repository",
+        "article_repository",
+        "mrp_repository",
+        "rule_repository",
+    }
+    assert isinstance(kwargs["cfo_repository"], SqlAlchemyCFORepository)
+    assert isinstance(kwargs["article_repository"], SqlAlchemyBudgetArticleRepository)
+    assert isinstance(kwargs["mrp_repository"], SqlAlchemyMRPRepository)
+    assert isinstance(kwargs["rule_repository"], SqlAlchemySavingsDistributionRuleRepository)
+    _assert_successful_transaction(session, transaction)
+
+
+def test_delete_distribution_rule_runs_feature_in_transaction() -> None:
+    session, transaction = _session_with_transaction()
+    rule_id = uuid4()
+    feature = AsyncMock(return_value=None)
+
+    with patch(
+        "sigma.modules.dictionaries.facade.delete_savings_distribution_rule_feature", feature
+    ):
+        result = asyncio.run(DictionariesFacade(session).delete_savings_distribution_rule(rule_id))
+
+    assert result is None
+    feature.assert_awaited_once()
+    (passed_id, repository), kwargs = _awaited_call(feature)
+    assert passed_id == rule_id
+    assert isinstance(repository, SqlAlchemySavingsDistributionRuleRepository)
+    assert kwargs == {}
+    _assert_successful_transaction(session, transaction)
+
+
+def test_get_distribution_rule_without_write_transaction() -> None:
+    session = MagicMock(spec=AsyncSession)
+    rule = SavingsDistributionRule(cfo_id=uuid4(), budget_article_id=uuid4(), mrp_id=uuid4())
+    feature = AsyncMock(return_value=rule)
+
+    with patch("sigma.modules.dictionaries.facade.get_savings_distribution_rule_feature", feature):
+        result = asyncio.run(DictionariesFacade(session).get_savings_distribution_rule(rule.id))
+
+    assert result is rule
+    feature.assert_awaited_once()
+    (rule_id, repository), kwargs = _awaited_call(feature)
+    assert rule_id == rule.id
+    assert isinstance(repository, SqlAlchemySavingsDistributionRuleRepository)
+    assert kwargs == {}
+    session.begin.assert_not_called()
+
+
+@pytest.mark.parametrize("empty", [False, True])
+def test_list_distribution_rules_without_write_transaction(empty: bool) -> None:
+    session = MagicMock(spec=AsyncSession)
+    cfo = CFO(name="Закупки")
+    category = Category(name="Командировки")
+    article = BudgetArticle.create("Билеты", category)
+    mrp = MRP(name="Иванов")
+    items = (
+        []
+        if empty
+        else [
+            SavingsDistributionRuleListItem(
+                rule=SavingsDistributionRule.create(cfo, article, mrp),
+                cfo=cfo,
+                budget_article=article,
+                category=category,
+                mrp=mrp,
+            )
+        ]
+    )
+    feature = AsyncMock(return_value=items)
+
+    with patch(
+        "sigma.modules.dictionaries.facade.list_savings_distribution_rules_feature", feature
+    ):
+        result = asyncio.run(DictionariesFacade(session).list_savings_distribution_rules())
+
+    assert result is items
+    feature.assert_awaited_once()
+    (repository,), kwargs = _awaited_call(feature)
+    assert isinstance(repository, SqlAlchemySavingsDistributionRuleRepository)
+    assert kwargs == {}
+    session.begin.assert_not_called()
+
+
+@pytest.mark.parametrize("found", [False, True])
+def test_find_mrp_by_distribution_rule_without_write_transaction(found: bool) -> None:
+    session = MagicMock(spec=AsyncSession)
+    cfo_id, article_id = uuid4(), uuid4()
+    mrp = MRP(name="Иванов") if found else None
+    feature = AsyncMock(return_value=mrp)
+
+    with patch(
+        "sigma.modules.dictionaries.facade.find_mrp_by_savings_distribution_rule_feature", feature
+    ):
+        result = asyncio.run(
+            DictionariesFacade(session).find_mrp_by_savings_distribution_rule(cfo_id, article_id)
+        )
+
+    assert result is mrp
+    feature.assert_awaited_once()
+    args, kwargs = _awaited_call(feature)
+    assert args == (cfo_id, article_id)
+    assert set(kwargs) == {
+        "cfo_repository",
+        "article_repository",
+        "mrp_repository",
+        "rule_repository",
+    }
+    assert isinstance(kwargs["cfo_repository"], SqlAlchemyCFORepository)
+    assert isinstance(kwargs["article_repository"], SqlAlchemyBudgetArticleRepository)
+    assert isinstance(kwargs["mrp_repository"], SqlAlchemyMRPRepository)
+    assert isinstance(kwargs["rule_repository"], SqlAlchemySavingsDistributionRuleRepository)
+    session.begin.assert_not_called()
+
+
+@pytest.mark.parametrize("operation", ["create", "update", "delete"])
+def test_distribution_rule_write_error_exits_transaction_without_suppression(
+    operation: str,
+) -> None:
+    session, transaction = _session_with_transaction()
+    rule_id = uuid4()
+    error = SavingsDistributionRuleNotFoundError(rule_id)
+    feature = AsyncMock(side_effect=error)
+
+    async def run() -> None:
+        facade = DictionariesFacade(session)
+        if operation == "create":
+            await facade.create_savings_distribution_rule(uuid4(), uuid4(), uuid4())
+        elif operation == "update":
+            await facade.update_savings_distribution_rule(rule_id, uuid4(), uuid4(), uuid4())
+        else:
+            await facade.delete_savings_distribution_rule(rule_id)
+
+    with (
+        patch(
+            f"sigma.modules.dictionaries.facade.{operation}_savings_distribution_rule_feature",
+            feature,
+        ),
+        pytest.raises(SavingsDistributionRuleNotFoundError) as caught,
+    ):
+        asyncio.run(run())
+
+    assert caught.value is error
+    feature.assert_awaited_once()
+    session.begin.assert_called_once_with()
+    transaction.__aenter__.assert_awaited_once_with()
+    transaction.__aexit__.assert_awaited_once()
+    (error_type, passed_error, traceback), kwargs = _awaited_call(transaction.__aexit__)
+    assert error_type is type(error)
+    assert passed_error is error
+    assert isinstance(traceback, TracebackType)
+    assert kwargs == {}
 
 
 def test_create_category_runs_feature_in_transaction() -> None:
