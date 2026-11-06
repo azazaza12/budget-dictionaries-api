@@ -1,4 +1,4 @@
-"""add savings distribution rules
+"""add distribution rules
 
 Revision ID: 72bb6d25850f
 Revises: 91e7f4c2a860
@@ -19,7 +19,7 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     op.create_table(
-        "savings_distribution_rules",
+        "distribution_rules",
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column("cfo_id", sa.Uuid(), nullable=False),
         sa.Column("budget_article_id", sa.Uuid(), nullable=False),
@@ -27,27 +27,27 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["budget_article_id"],
             ["budget_articles.id"],
-            name=op.f("fk_savings_distribution_rules_budget_article_id_budget_articles"),
+            name=op.f("fk_distribution_rules_budget_article_id_budget_articles"),
             ondelete="RESTRICT",
         ),
         sa.ForeignKeyConstraint(
             ["cfo_id"],
             ["cfo.id"],
-            name=op.f("fk_savings_distribution_rules_cfo_id_cfo"),
+            name=op.f("fk_distribution_rules_cfo_id_cfo"),
             ondelete="RESTRICT",
         ),
         sa.ForeignKeyConstraint(
             ["mrp_id"],
             ["mrp.id"],
-            name=op.f("fk_savings_distribution_rules_mrp_id_mrp"),
+            name=op.f("fk_distribution_rules_mrp_id_mrp"),
             ondelete="RESTRICT",
         ),
-        sa.PrimaryKeyConstraint("id", name=op.f("pk_savings_distribution_rules")),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_distribution_rules")),
         sa.UniqueConstraint(
-            "cfo_id", "budget_article_id", name="uq_savings_distribution_rules_cfo_article"
+            "cfo_id", "budget_article_id", name="uq_distribution_rules_cfo_article"
         ),
     )
 
 
 def downgrade() -> None:
-    op.drop_table("savings_distribution_rules")
+    op.drop_table("distribution_rules")
