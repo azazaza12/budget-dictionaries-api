@@ -24,7 +24,7 @@ from sigma.modules.dictionaries.facade import (
     SavingsDistributionRuleNotFoundError,
 )
 from sigma.modules.dictionaries.repository import (
-    SavingsDistributionRuleListItem,
+    SavingsDistributionRuleDetails,
     SqlAlchemyBudgetArticleRepository,
     SqlAlchemyCategoryRepository,
     SqlAlchemyCFORepository,
@@ -225,7 +225,7 @@ def test_list_distribution_rules_without_write_transaction(empty: bool) -> None:
         []
         if empty
         else [
-            SavingsDistributionRuleListItem(
+            SavingsDistributionRuleDetails(
                 rule=SavingsDistributionRule.create(cfo, article, mrp),
                 cfo=cfo,
                 budget_article=article,

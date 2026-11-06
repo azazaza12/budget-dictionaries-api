@@ -82,7 +82,7 @@ class CFORepository(Protocol):
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class SavingsDistributionRuleListItem:
+class SavingsDistributionRuleDetails:
     rule: SavingsDistributionRule
     cfo: CFO
     budget_article: BudgetArticle
@@ -93,7 +93,7 @@ class SavingsDistributionRuleListItem:
 class SavingsDistributionRuleRepository(Protocol):
     async def get(self, rule_id: UUID) -> SavingsDistributionRule | None: ...
 
-    async def list(self) -> list[SavingsDistributionRuleListItem]: ...
+    async def list(self) -> list[SavingsDistributionRuleDetails]: ...
 
     async def add(self, rule: SavingsDistributionRule) -> None: ...
 
@@ -372,7 +372,7 @@ class SqlAlchemySavingsDistributionRuleRepository:
         )
         await self._session.execute(statement)
 
-    async def list(self) -> list[SavingsDistributionRuleListItem]:
+    async def list(self) -> list[SavingsDistributionRuleDetails]:
         statement = (
             select(
                 SavingsDistributionRuleModel,
@@ -397,7 +397,7 @@ class SqlAlchemySavingsDistributionRuleRepository:
         )
         rows = (await self._session.execute(statement)).all()
         return [
-            SavingsDistributionRuleListItem(
+            SavingsDistributionRuleDetails(
                 rule=self._to_domain(rule),
                 cfo=SqlAlchemyCFORepository._to_domain(cfo),
                 budget_article=SqlAlchemyBudgetArticleRepository._to_domain(article),

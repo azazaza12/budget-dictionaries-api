@@ -14,7 +14,7 @@ from sigma.modules.dictionaries.features.list_savings_distribution_rules import 
     list_savings_distribution_rules,
 )
 from sigma.modules.dictionaries.repository import (
-    SavingsDistributionRuleListItem,
+    SavingsDistributionRuleDetails,
     SavingsDistributionRuleRepository,
 )
 
@@ -29,7 +29,7 @@ def test_list_rules_returns_repository_items_without_changes(empty: bool) -> Non
         []
         if empty
         else [
-            SavingsDistributionRuleListItem(
+            SavingsDistributionRuleDetails(
                 rule=SavingsDistributionRule(
                     cfo_id=cfo.id,
                     budget_article_id=article.id,

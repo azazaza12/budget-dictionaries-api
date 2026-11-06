@@ -66,7 +66,7 @@ from .features.update_savings_distribution_rule import (
     update_savings_distribution_rule as update_savings_distribution_rule_feature,
 )
 from .repository import (
-    SavingsDistributionRuleListItem,
+    SavingsDistributionRuleDetails,
     SqlAlchemyBudgetArticleRepository,
     SqlAlchemyCategoryRepository,
     SqlAlchemyCFORepository,
@@ -236,7 +236,7 @@ class DictionariesFacade:
     async def get_savings_distribution_rule(self, rule_id: UUID) -> SavingsDistributionRule:
         return await get_savings_distribution_rule_feature(rule_id, self._rule_repository)
 
-    async def list_savings_distribution_rules(self) -> list[SavingsDistributionRuleListItem]:
+    async def list_savings_distribution_rules(self) -> list[SavingsDistributionRuleDetails]:
         return await list_savings_distribution_rules_feature(self._rule_repository)
 
     async def update_savings_distribution_rule(

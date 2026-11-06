@@ -90,7 +90,7 @@ class SavingsDistributionRuleView(BaseModel):
     mrp_id: UUID
 
 
-class SavingsDistributionRuleListItemView(BaseModel):
+class SavingsDistributionRuleDetailsView(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     rule: SavingsDistributionRuleView

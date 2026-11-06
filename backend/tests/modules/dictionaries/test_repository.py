@@ -20,7 +20,7 @@ from sigma.modules.dictionaries.models import (
     SavingsDistributionRuleModel,
 )
 from sigma.modules.dictionaries.repository import (
-    SavingsDistributionRuleListItem,
+    SavingsDistributionRuleDetails,
     SqlAlchemyBudgetArticleRepository,
     SqlAlchemyCategoryRepository,
     SqlAlchemyCFORepository,
@@ -75,7 +75,7 @@ def test_list_distribution_rules_maps_joined_records_without_archive_filter(
     rule = SavingsDistributionRuleModel(
         id=uuid4(), cfo_id=cfo.id, budget_article_id=article.id, mrp_id=mrp.id
     )
-    item = SavingsDistributionRuleListItem(
+    item = SavingsDistributionRuleDetails(
         rule=SavingsDistributionRule(
             id=rule.id,
             cfo_id=cfo.id,

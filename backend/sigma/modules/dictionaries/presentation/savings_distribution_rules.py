@@ -5,8 +5,8 @@ from fastapi import APIRouter, Depends, status
 from .dependencies import DictionariesFacadeDependency, require_dictionaries_admin
 from .schemas import (
     MRPView,
+    SavingsDistributionRuleDetailsView,
     SavingsDistributionRuleInput,
-    SavingsDistributionRuleListItemView,
     SavingsDistributionRuleView,
 )
 
@@ -32,9 +32,9 @@ async def recommend_mrp(
 @router.get("")
 async def list_savings_distribution_rules(
     dictionaries: DictionariesFacadeDependency,
-) -> list[SavingsDistributionRuleListItemView]:
+) -> list[SavingsDistributionRuleDetailsView]:
     items = await dictionaries.list_savings_distribution_rules()
-    return [SavingsDistributionRuleListItemView.model_validate(item) for item in items]
+    return [SavingsDistributionRuleDetailsView.model_validate(item) for item in items]
 
 
 @router.post(
