@@ -4,8 +4,14 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .domain import CFO, MRP, BudgetArticle, Category
-from .models import BudgetArticleModel, CategoryModel, CFOModel, MRPModel
+from .domain import (
+    CFO,
+    MRP,
+    BudgetArticle,
+    Category,
+    Organization,
+)
+from .models import BudgetArticleModel, CategoryModel, CFOModel, MRPModel, OrganizationModel
 
 
 class CategoryRepository(Protocol):
@@ -71,6 +77,24 @@ class CFORepository(Protocol):
 
     async def name_exists(
         self, normalized_name: str, *, exclude_id: UUID | None = None
+    ) -> bool: ...
+
+
+class OrganizationRepository(Protocol):
+    async def get(self, id: UUID) -> Organization | None: ...
+
+    async def add(self, organization: Organization) -> None: ...
+
+    async def list(self, *, include_archived: bool = False) -> list[Organization]: ...
+
+    async def save(self, organization: Organization) -> None: ...
+
+    async def name_exists(
+        self, normalized_name: str, *, exclude_id: UUID | None = None
+    ) -> bool: ...
+
+    async def name_in_1c_exists(
+        self, normalized_name_in_1c: str, *, exclude_id: UUID | None = None
     ) -> bool: ...
 
 
@@ -283,5 +307,69 @@ class SqlAlchemyCFORepository:
         query = select(CFOModel.id).where(CFOModel.normalized_name == normalized_name)
         if exclude_id is not None:
             query = query.where(CFOModel.id != exclude_id)
+        statement = select(query.exists())
+        return bool(await self._session.scalar(statement))
+
+
+class SqlAlchemyOrganizationRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    @staticmethod
+    def _to_domain(model: OrganizationModel) -> Organization:
+        return Organization(
+            id=model.id, name=model.name, name_in_1c=model.name_in_1c, is_archived=model.is_archived
+        )
+
+    @staticmethod
+    def _to_model(organization: Organization) -> OrganizationModel:
+        return OrganizationModel(
+            id=organization.id,
+            name=organization.name,
+            name_in_1c=organization.name_in_1c,
+            normalized_name=organization.normalized_name,
+            normalized_name_in_1c=organization.normalized_name_in_1c,
+            is_archived=organization.is_archived,
+        )
+
+    async def get(self, id: UUID) -> Organization | None:
+        model = await self._session.get(OrganizationModel, id)
+        if model is None:
+            return None
+        return self._to_domain(model)
+
+    async def add(self, organization: Organization) -> None:
+        self._session.add(self._to_model(organization))
+
+    async def list(self, *, include_archived: bool = False) -> list[Organization]:
+        statement = select(OrganizationModel)
+        if not include_archived:
+            statement = statement.where(OrganizationModel.is_archived.is_(False))
+        statement = statement.order_by(OrganizationModel.normalized_name, OrganizationModel.id)
+
+        organizations = await self._session.scalars(statement)
+        return [self._to_domain(model) for model in organizations]
+
+    async def save(self, organization: Organization) -> None:
+        model = self._to_model(organization)
+        await self._session.merge(model)
+
+    async def name_exists(self, normalized_name: str, *, exclude_id: UUID | None = None) -> bool:
+        query = select(OrganizationModel.id).where(
+            OrganizationModel.normalized_name == normalized_name
+        )
+        if exclude_id is not None:
+            query = query.where(OrganizationModel.id != exclude_id)
+        statement = select(query.exists())
+        return bool(await self._session.scalar(statement))
+
+    async def name_in_1c_exists(
+        self, normalized_name_in_1c: str, *, exclude_id: UUID | None = None
+    ) -> bool:
+        query = select(OrganizationModel.id).where(
+            OrganizationModel.normalized_name_in_1c == normalized_name_in_1c
+        )
+        if exclude_id is not None:
+            query = query.where(OrganizationModel.id != exclude_id)
         statement = select(query.exists())
         return bool(await self._session.scalar(statement))

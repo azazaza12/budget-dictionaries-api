@@ -5,13 +5,21 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sigma.modules.dictionaries.domain import CFO, MRP, BudgetArticle, Category
-from sigma.modules.dictionaries.models import BudgetArticleModel, CategoryModel, CFOModel, MRPModel
+from sigma.modules.dictionaries.domain import CFO, MRP, BudgetArticle, Category, Organization
+from sigma.modules.dictionaries.models import (
+    BudgetArticleModel,
+    CategoryModel,
+    CFOModel,
+    MRPModel,
+    OrganizationModel,
+)
 from sigma.modules.dictionaries.repository import (
+    OrganizationRepository,
     SqlAlchemyBudgetArticleRepository,
     SqlAlchemyCategoryRepository,
     SqlAlchemyCFORepository,
     SqlAlchemyMRPRepository,
+    SqlAlchemyOrganizationRepository,
 )
 
 
@@ -350,5 +358,181 @@ def test_mrp_name_existence_query(exclude_self: bool, exists: bool) -> None:
     assert "is_archived" not in sql
     assert ("mrp.id !=" in sql) is exclude_self
     assert "иванов" in statement.compile().params.values()
+    if excluded_id is not None:
+        assert excluded_id in statement.compile().params.values()
+
+
+@pytest.mark.parametrize("is_archived", [False, True])
+def test_get_organization_maps_model_to_domain(is_archived: bool) -> None:
+    organization_id = uuid4()
+    session = MagicMock(spec=AsyncSession)
+    session.get = AsyncMock(
+        return_value=OrganizationModel(
+            id=organization_id,
+            name="Пример",
+            name_in_1c="ООО «Тестовая Компания»",
+            normalized_name="пример",
+            normalized_name_in_1c='ооо "тестовая компания"',
+            is_archived=is_archived,
+        )
+    )
+    repository: OrganizationRepository = SqlAlchemyOrganizationRepository(session)
+
+    organization = asyncio.run(repository.get(organization_id))
+
+    assert organization == Organization(
+        id=organization_id,
+        name="Пример",
+        name_in_1c="ООО «Тестовая Компания»",
+        is_archived=is_archived,
+    )
+    session.get.assert_awaited_once_with(OrganizationModel, organization_id)
+
+
+def test_get_missing_organization_returns_none() -> None:
+    session = MagicMock(spec=AsyncSession)
+    session.get = AsyncMock(return_value=None)
+    repository = SqlAlchemyOrganizationRepository(session)
+    organization_id = uuid4()
+
+    assert asyncio.run(repository.get(organization_id)) is None
+    session.get.assert_awaited_once_with(OrganizationModel, organization_id)
+
+
+@pytest.mark.parametrize("is_archived", [False, True])
+def test_add_organization_maps_domain_to_model(is_archived: bool) -> None:
+    session = MagicMock(spec=AsyncSession)
+    repository = SqlAlchemyOrganizationRepository(session)
+    organization = Organization(
+        name="  ПриМЕР  ",
+        name_in_1c="  ООО\u00a0«Тестовая   Компания»  ",
+        is_archived=is_archived,
+    )
+
+    asyncio.run(repository.add(organization))
+
+    session.add.assert_called_once()
+    model = session.add.call_args.args[0]
+    assert isinstance(model, OrganizationModel)
+    assert model.id == organization.id
+    assert model.name == "ПриМЕР"
+    assert model.name_in_1c == "ООО «Тестовая Компания»"
+    assert model.normalized_name == "пример"
+    assert model.normalized_name_in_1c == 'ооо "тестовая компания"'
+    assert model.is_archived is is_archived
+    session.commit.assert_not_called()
+
+
+@pytest.mark.parametrize("is_archived", [False, True])
+def test_save_organization_merges_model(is_archived: bool) -> None:
+    session = MagicMock(spec=AsyncSession)
+    session.merge = AsyncMock()
+    repository = SqlAlchemyOrganizationRepository(session)
+    organization = Organization(
+        name="Пример", name_in_1c="ООО «Тестовая Компания»", is_archived=is_archived
+    )
+
+    asyncio.run(repository.save(organization))
+
+    session.merge.assert_awaited_once()
+    model = session.merge.await_args.args[0]
+    assert isinstance(model, OrganizationModel)
+    assert model.id == organization.id
+    assert model.name == organization.name
+    assert model.name_in_1c == organization.name_in_1c
+    assert model.normalized_name == organization.normalized_name
+    assert model.normalized_name_in_1c == organization.normalized_name_in_1c
+    assert model.is_archived is is_archived
+    session.commit.assert_not_called()
+
+
+@pytest.mark.parametrize("include_archived", [False, True])
+def test_list_organizations_maps_models_and_filters_archived(include_archived: bool) -> None:
+    organization_id = uuid4()
+    session = MagicMock(spec=AsyncSession)
+    session.scalars = AsyncMock(
+        return_value=[
+            OrganizationModel(
+                id=organization_id,
+                name="Пример",
+                name_in_1c="ООО «Тестовая Компания»",
+                normalized_name="пример",
+                normalized_name_in_1c='ооо "тестовая компания"',
+                is_archived=include_archived,
+            )
+        ]
+    )
+    repository = SqlAlchemyOrganizationRepository(session)
+
+    organizations = asyncio.run(repository.list(include_archived=include_archived))
+
+    assert organizations == [
+        Organization(
+            id=organization_id,
+            name="Пример",
+            name_in_1c="ООО «Тестовая Компания»",
+            is_archived=include_archived,
+        )
+    ]
+    session.scalars.assert_awaited_once()
+    sql = str(session.scalars.await_args.args[0])
+    assert ("organizations.is_archived IS false" in sql) is not include_archived
+    assert "ORDER BY organizations.normalized_name, organizations.id" in sql
+
+
+def test_list_organizations_excludes_archived_by_default() -> None:
+    session = MagicMock(spec=AsyncSession)
+    session.scalars = AsyncMock(return_value=[])
+    repository = SqlAlchemyOrganizationRepository(session)
+
+    assert asyncio.run(repository.list()) == []
+    assert "organizations.is_archived IS false" in str(session.scalars.await_args.args[0])
+
+
+@pytest.mark.parametrize("exclude_self", [False, True])
+@pytest.mark.parametrize("exists", [False, True])
+def test_organization_name_existence_query(exclude_self: bool, exists: bool) -> None:
+    session = MagicMock(spec=AsyncSession)
+    session.scalar = AsyncMock(return_value=exists)
+    repository = SqlAlchemyOrganizationRepository(session)
+    excluded_id = uuid4() if exclude_self else None
+
+    result = asyncio.run(repository.name_exists("пример", exclude_id=excluded_id))
+
+    assert result is exists
+    session.scalar.assert_awaited_once()
+    statement = session.scalar.await_args.args[0]
+    sql = str(statement)
+    assert "EXISTS (SELECT organizations.id" in sql
+    assert "organizations.normalized_name =" in sql
+    assert "is_archived" not in sql
+    assert ("organizations.id !=" in sql) is exclude_self
+    assert "пример" in statement.compile().params.values()
+    if excluded_id is not None:
+        assert excluded_id in statement.compile().params.values()
+
+
+@pytest.mark.parametrize("exclude_self", [False, True])
+@pytest.mark.parametrize("exists", [False, True])
+def test_organization_1c_name_existence_query(exclude_self: bool, exists: bool) -> None:
+    session = MagicMock(spec=AsyncSession)
+    session.scalar = AsyncMock(return_value=exists)
+    repository = SqlAlchemyOrganizationRepository(session)
+    excluded_id = uuid4() if exclude_self else None
+    normalized_name_in_1c = 'ооо "тестовая компания"'
+
+    result = asyncio.run(
+        repository.name_in_1c_exists(normalized_name_in_1c, exclude_id=excluded_id)
+    )
+
+    assert result is exists
+    session.scalar.assert_awaited_once()
+    statement = session.scalar.await_args.args[0]
+    sql = str(statement)
+    assert "EXISTS (SELECT organizations.id" in sql
+    assert "organizations.normalized_name_in_1c =" in sql
+    assert "is_archived" not in sql
+    assert ("organizations.id !=" in sql) is exclude_self
+    assert normalized_name_in_1c in statement.compile().params.values()
     if excluded_id is not None:
         assert excluded_id in statement.compile().params.values()
