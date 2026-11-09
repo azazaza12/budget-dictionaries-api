@@ -48,6 +48,12 @@ def normalize_name(value: str) -> str:
     return clean_name(value).casefold()
 
 
+def normalize_1c_name(value: str) -> str:
+    cleaned_name = clean_name(value)
+    quote_translation = str.maketrans({"«": '"', "»": '"', "“": '"', "”": '"', "„": '"'})
+    return cleaned_name.translate(quote_translation).casefold()
+
+
 @dataclass(slots=True, kw_only=True)
 class BaseDictionary:
     name: str
@@ -112,3 +118,22 @@ class MRP(BaseDictionary):
 class CFO(BaseDictionary):
     def restore(self) -> None:
         self.is_archived = False
+
+
+@dataclass(slots=True, kw_only=True)
+class Organization(BaseDictionary):
+    name_in_1c: str
+
+    def __post_init__(self) -> None:
+        self.name = clean_name(self.name)
+        self.name_in_1c = clean_name(self.name_in_1c)
+
+    @property
+    def normalized_name_in_1c(self) -> str:
+        return normalize_1c_name(self.name_in_1c)
+
+    def restore(self) -> None:
+        self.is_archived = False
+
+    def rename(self, new_name: str) -> None:
+        raise NotImplementedError("Organization renaming rules are not defined yet")

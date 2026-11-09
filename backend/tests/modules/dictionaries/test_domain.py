@@ -11,7 +11,9 @@ from sigma.modules.dictionaries.domain import (
     Category,
     DictionariesDomainError,
     InvalidDictionaryNameError,
+    Organization,
     clean_name,
+    normalize_1c_name,
     normalize_name,
 )
 
@@ -226,3 +228,102 @@ def test_mrp_archive_and_restore_are_idempotent() -> None:
     assert not mrp.is_archived
     assert mrp.id == original_id
     assert mrp.name == "Иванов"
+
+
+@pytest.mark.parametrize(
+    "name_in_1c",
+    [
+        'ООО "Тестовая Компания"',
+        "ООО «Тестовая Компания»",
+        "ООО “Тестовая Компания”",
+        "ООО „Тестовая Компания“",
+        "  оОо\t«Тестовая\u00a0\u00a0Компания»\n",
+    ],
+)
+def test_normalize_1c_name_ignores_case_whitespace_and_quote_style(name_in_1c: str) -> None:
+    assert normalize_1c_name(name_in_1c) == 'ооо "тестовая компания"'
+
+
+@pytest.mark.parametrize("name_in_1c", ["", " \t\n ", "\u00a0"])
+def test_normalize_1c_name_rejects_empty_value(name_in_1c: str) -> None:
+    with pytest.raises(InvalidDictionaryNameError):
+        normalize_1c_name(name_in_1c)
+
+
+def test_normalize_1c_name_preserves_legal_form_and_punctuation() -> None:
+    assert normalize_1c_name("ООО «Тестовая-Компания»") == 'ооо "тестовая-компания"'
+
+
+def test_organization_cleans_fields_and_exposes_normalized_values() -> None:
+    organization = Organization(
+        name="  ПриМЕР\u00a0 ",
+        name_in_1c="  ООО\t«Тестовая\u00a0\u00a0Компания»\n",
+    )
+
+    assert organization.normalized_name == "пример"
+    assert organization.normalized_name_in_1c == 'ооо "тестовая компания"'
+    assert organization.name == "ПриМЕР"
+    assert organization.name_in_1c == "ООО «Тестовая Компания»"
+    assert not organization.is_archived
+
+
+@pytest.mark.parametrize("empty_value", ["", " \t\n ", "\u00a0"])
+def test_organization_rejects_empty_name(empty_value: str) -> None:
+    with pytest.raises(InvalidDictionaryNameError):
+        Organization(name=empty_value, name_in_1c="ООО «Образец»")
+
+
+@pytest.mark.parametrize("empty_value", ["", " \t\n ", "\u00a0"])
+def test_organization_rejects_empty_name_in_1c(empty_value: str) -> None:
+    with pytest.raises(InvalidDictionaryNameError):
+        Organization(name="Образец", name_in_1c=empty_value)
+
+
+@pytest.mark.parametrize("is_archived", [False, True])
+def test_organization_archive_is_idempotent_and_preserves_identity(is_archived: bool) -> None:
+    organization_id = uuid4()
+    organization = Organization(
+        id=organization_id,
+        name="Образец",
+        name_in_1c="ООО «Образец»",
+        is_archived=is_archived,
+    )
+
+    organization.archive()
+    organization.archive()
+
+    assert organization.is_archived
+    assert organization.id == organization_id
+    assert organization.name == "Образец"
+    assert organization.name_in_1c == "ООО «Образец»"
+
+
+@pytest.mark.parametrize("is_archived", [False, True])
+def test_organization_restore_is_idempotent_and_preserves_identity(is_archived: bool) -> None:
+    organization_id = uuid4()
+    organization = Organization(
+        id=organization_id,
+        name="Образец",
+        name_in_1c="ООО «Образец»",
+        is_archived=is_archived,
+    )
+
+    organization.restore()
+    organization.restore()
+
+    assert not organization.is_archived
+    assert organization.id == organization_id
+    assert organization.name == "Образец"
+    assert organization.name_in_1c == "ООО «Образец»"
+
+
+def test_organization_rename_is_not_implemented_and_preserves_name() -> None:
+    organization = Organization(name="Образец", name_in_1c="ООО «Образец»")
+
+    with pytest.raises(
+        NotImplementedError, match="Organization renaming rules are not defined yet"
+    ):
+        organization.rename("Другое название")
+
+    assert organization.name == "Образец"
+    assert organization.name_in_1c == "ООО «Образец»"
