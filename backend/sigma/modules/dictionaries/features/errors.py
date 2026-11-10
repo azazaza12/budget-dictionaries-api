@@ -14,6 +14,22 @@ class DuplicateDictionaryNameError(DictionariesFeatureError):
         super().__init__(f"Dictionary name '{name}' already exists")
 
 
+class DuplicateOrganizationNameIn1CError(DictionariesFeatureError):
+    code = "duplicate_organization_name_in_1c"
+
+    def __init__(self, name_in_1c: str) -> None:
+        self.name_in_1c = name_in_1c
+        super().__init__(f"Organization name in 1C '{name_in_1c}' already exists")
+
+
+class OrganizationNotFoundError(DictionariesFeatureError):
+    code = "organization_not_found"
+
+    def __init__(self, organization_id: UUID) -> None:
+        self.organization_id = organization_id
+        super().__init__(f"Organization {organization_id} was not found")
+
+
 class CategoryNotFoundError(DictionariesFeatureError):
     code = "category_not_found"
 

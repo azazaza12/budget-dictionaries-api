@@ -7,7 +7,9 @@ from sigma.modules.dictionaries.features.errors import (
     CategoryNotFoundError,
     DictionariesFeatureError,
     DuplicateDictionaryNameError,
+    DuplicateOrganizationNameIn1CError,
     MRPNotFoundError,
+    OrganizationNotFoundError,
 )
 
 
@@ -18,6 +20,8 @@ from sigma.modules.dictionaries.features.errors import (
         (CategoryNotFoundError, "category_not_found"),
         (BudgetArticleNotFoundError, "budget_article_not_found"),
         (MRPNotFoundError, "mrp_not_found"),
+        (DuplicateOrganizationNameIn1CError, "duplicate_organization_name_in_1c"),
+        (OrganizationNotFoundError, "organization_not_found"),
     ],
 )
 def test_feature_errors_have_stable_codes(
@@ -31,6 +35,22 @@ def test_duplicate_name_error_exposes_name() -> None:
     error = DuplicateDictionaryNameError("Авиабилеты")
 
     assert error.name == "Авиабилеты"
+
+
+def test_duplicate_organization_1c_name_error_exposes_name_in_1c() -> None:
+    error = DuplicateOrganizationNameIn1CError("ООО «Тестовая Компания»")
+
+    assert error.name_in_1c == "ООО «Тестовая Компания»"
+    assert error.name_in_1c in str(error)
+
+
+def test_organization_not_found_error_exposes_organization_id() -> None:
+    organization_id = uuid4()
+
+    error = OrganizationNotFoundError(organization_id)
+
+    assert error.organization_id == organization_id
+    assert str(organization_id) in str(error)
 
 
 def test_category_not_found_error_exposes_category_id() -> None:
