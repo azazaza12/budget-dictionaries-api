@@ -13,7 +13,7 @@ from sigma.modules.dictionaries.repository import OrganizationRepository
 @pytest.mark.parametrize("is_archived", [False, True])
 def test_restore_organization_is_idempotent(is_archived: bool) -> None:
     organization = Organization(
-        name="Пример", name_in_1c="ООО «Тестовая Компания»", is_archived=is_archived
+        name="Пример", external_name="ООО «Тестовая Компания»", is_archived=is_archived
     )
     repository = MagicMock(spec=OrganizationRepository)
     repository.get = AsyncMock(return_value=organization)

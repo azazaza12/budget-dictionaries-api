@@ -29,7 +29,7 @@ from .features.errors import (
     CFONotFoundError,
     DictionariesFeatureError,
     DuplicateDictionaryNameError,
-    DuplicateOrganizationNameIn1CError,
+    DuplicateOrganizationExternalNameError,
     MRPNotFoundError,
     OrganizationNotFoundError,
 )
@@ -67,7 +67,7 @@ __all__ = (
     "DictionariesFacade",
     "DictionariesFeatureError",
     "DuplicateDictionaryNameError",
-    "DuplicateOrganizationNameIn1CError",
+    "DuplicateOrganizationExternalNameError",
     "InvalidDictionaryNameError",
     "MRPNotFoundError",
     "OrganizationNotFoundError",
@@ -199,10 +199,10 @@ class DictionariesFacade:
     async def list_cfos(self, *, include_archived: bool = False) -> list[CFO]:
         return await list_cfos_feature(self._cfo_repository, include_archived=include_archived)
 
-    async def create_organization(self, name: str, name_in_1c: str) -> Organization:
+    async def create_organization(self, name: str, external_name: str) -> Organization:
         async with self._session.begin():
             return await create_organization_feature(
-                name, name_in_1c, self._organization_repository
+                name, external_name, self._organization_repository
             )
 
     async def archive_organization(self, id: UUID) -> Organization:
@@ -219,9 +219,9 @@ class DictionariesFacade:
         )
 
     async def rename_organization(
-        self, id: UUID, new_name: str, new_name_in_1c: str
+        self, id: UUID, new_name: str, new_external_name: str
     ) -> Organization:
         async with self._session.begin():
             return await rename_organization_feature(
-                id, new_name, new_name_in_1c, self._organization_repository
+                id, new_name, new_external_name, self._organization_repository
             )

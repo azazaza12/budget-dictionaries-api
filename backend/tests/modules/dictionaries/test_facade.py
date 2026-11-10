@@ -13,7 +13,7 @@ from sigma.modules.dictionaries.domain import CFO, MRP, BudgetArticle, Category,
 from sigma.modules.dictionaries.facade import (
     DictionariesFacade,
     DuplicateDictionaryNameError,
-    DuplicateOrganizationNameIn1CError,
+    DuplicateOrganizationExternalNameError,
     MRPNotFoundError,
     OrganizationNotFoundError,
 )
@@ -74,7 +74,7 @@ def test_facade_exports_public_errors_without_domain_entities() -> None:
         "DictionariesFacade",
         "DictionariesFeatureError",
         "DuplicateDictionaryNameError",
-        "DuplicateOrganizationNameIn1CError",
+        "DuplicateOrganizationExternalNameError",
         "InvalidDictionaryNameError",
         "MRPNotFoundError",
         "OrganizationNotFoundError",
@@ -635,43 +635,43 @@ def test_cfo_feature_error_exits_transaction_unchanged() -> None:
 
 def test_create_organization_runs_feature_in_transaction() -> None:
     session, transaction = _session_with_transaction()
-    organization = Organization(name="Пример", name_in_1c="ООО «Тестовая Компания»")
+    organization = Organization(name="Пример", external_name="ООО «Тестовая Компания»")
     feature = AsyncMock(return_value=organization)
 
     with patch("sigma.modules.dictionaries.facade.create_organization_feature", feature):
         result = asyncio.run(
             DictionariesFacade(session).create_organization(
-                organization.name, organization.name_in_1c
+                organization.name, organization.external_name
             )
         )
 
     assert result is organization
     feature.assert_awaited_once()
-    (name, name_in_1c, repository), _ = _awaited_call(feature)
+    (name, external_name, repository), _ = _awaited_call(feature)
     assert name == organization.name
-    assert name_in_1c == organization.name_in_1c
+    assert external_name == organization.external_name
     assert isinstance(repository, SqlAlchemyOrganizationRepository)
     _assert_successful_transaction(session, transaction)
 
 
 def test_rename_organization_runs_feature_in_transaction() -> None:
     session, transaction = _session_with_transaction()
-    organization = Organization(name="Пример", name_in_1c="ООО «Тестовая Компания»")
+    organization = Organization(name="Пример", external_name="ООО «Тестовая Компания»")
     feature = AsyncMock(return_value=organization)
 
     with patch("sigma.modules.dictionaries.facade.rename_organization_feature", feature):
         result = asyncio.run(
             DictionariesFacade(session).rename_organization(
-                organization.id, organization.name, organization.name_in_1c
+                organization.id, organization.name, organization.external_name
             )
         )
 
     assert result is organization
     feature.assert_awaited_once()
-    (organization_id, name, name_in_1c, repository), _ = _awaited_call(feature)
+    (organization_id, name, external_name, repository), _ = _awaited_call(feature)
     assert organization_id == organization.id
     assert name == organization.name
-    assert name_in_1c == organization.name_in_1c
+    assert external_name == organization.external_name
     assert isinstance(repository, SqlAlchemyOrganizationRepository)
     _assert_successful_transaction(session, transaction)
 
@@ -681,7 +681,7 @@ def test_rename_organization_runs_feature_in_transaction() -> None:
     [
         OrganizationNotFoundError(uuid4()),
         DuplicateDictionaryNameError("Пример"),
-        DuplicateOrganizationNameIn1CError("ООО «Пример»"),
+        DuplicateOrganizationExternalNameError("ООО «Пример»"),
         facade_module.InvalidDictionaryNameError("Empty name"),
     ],
 )
@@ -710,7 +710,7 @@ def test_rename_organization_error_exits_transaction_unchanged(error: Exception)
 def test_organization_archive_and_restore_run_in_transaction(restore: bool) -> None:
     session, transaction = _session_with_transaction()
     organization = Organization(
-        name="Пример", name_in_1c="ООО «Тестовая Компания»", is_archived=not restore
+        name="Пример", external_name="ООО «Тестовая Компания»", is_archived=not restore
     )
     feature = AsyncMock(return_value=organization)
     feature_name = "restore_organization_feature" if restore else "archive_organization_feature"
@@ -734,7 +734,7 @@ def test_organization_archive_and_restore_run_in_transaction(restore: bool) -> N
 @pytest.mark.parametrize("include_archived", [False, True])
 def test_list_organizations_passes_filter_without_write_transaction(include_archived: bool) -> None:
     session = MagicMock(spec=AsyncSession)
-    organizations = [Organization(name="Пример", name_in_1c="ООО «Тестовая Компания»")]
+    organizations = [Organization(name="Пример", external_name="ООО «Тестовая Компания»")]
     feature = AsyncMock(return_value=organizations)
 
     with patch("sigma.modules.dictionaries.facade.list_organizations_feature", feature):
@@ -765,10 +765,10 @@ def test_list_organizations_excludes_archived_by_default() -> None:
 
 @pytest.mark.parametrize(
     "error",
-    [DuplicateDictionaryNameError("Пример"), DuplicateOrganizationNameIn1CError("ООО «Пример»")],
+    [DuplicateDictionaryNameError("Пример"), DuplicateOrganizationExternalNameError("ООО «Пример»")],
 )
 def test_create_organization_feature_error_exits_transaction_unchanged(
-    error: DuplicateDictionaryNameError | DuplicateOrganizationNameIn1CError,
+    error: DuplicateDictionaryNameError | DuplicateOrganizationExternalNameError,
 ) -> None:
     session, transaction = _session_with_transaction()
     feature = AsyncMock(side_effect=error)

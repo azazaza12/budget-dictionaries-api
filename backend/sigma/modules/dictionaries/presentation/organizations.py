@@ -15,7 +15,7 @@ router = APIRouter(prefix="/dictionaries/organizations", tags=["dictionaries"])
 async def create_organization(
     data: OrganizationInput, dictionaries: DictionariesFacadeDependency
 ) -> OrganizationView:
-    organization = await dictionaries.create_organization(data.name, data.name_in_1c)
+    organization = await dictionaries.create_organization(data.name, data.external_name)
     return OrganizationView.model_validate(organization)
 
 
@@ -48,6 +48,6 @@ async def rename_organization(
     organization_id: UUID, data: OrganizationInput, dictionaries: DictionariesFacadeDependency
 ) -> OrganizationView:
     organization = await dictionaries.rename_organization(
-        organization_id, data.name, data.name_in_1c
+        organization_id, data.name, data.external_name
     )
     return OrganizationView.model_validate(organization)

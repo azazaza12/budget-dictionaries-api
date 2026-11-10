@@ -93,8 +93,8 @@ class OrganizationRepository(Protocol):
         self, normalized_name: str, *, exclude_id: UUID | None = None
     ) -> bool: ...
 
-    async def name_in_1c_exists(
-        self, normalized_name_in_1c: str, *, exclude_id: UUID | None = None
+    async def external_name_exists(
+        self, normalized_external_name: str, *, exclude_id: UUID | None = None
     ) -> bool: ...
 
 
@@ -318,7 +318,10 @@ class SqlAlchemyOrganizationRepository:
     @staticmethod
     def _to_domain(model: OrganizationModel) -> Organization:
         return Organization(
-            id=model.id, name=model.name, name_in_1c=model.name_in_1c, is_archived=model.is_archived
+            id=model.id,
+            name=model.name,
+            external_name=model.external_name,
+            is_archived=model.is_archived,
         )
 
     @staticmethod
@@ -326,9 +329,9 @@ class SqlAlchemyOrganizationRepository:
         return OrganizationModel(
             id=organization.id,
             name=organization.name,
-            name_in_1c=organization.name_in_1c,
+            external_name=organization.external_name,
             normalized_name=organization.normalized_name,
-            normalized_name_in_1c=organization.normalized_name_in_1c,
+            normalized_external_name=organization.normalized_external_name,
             is_archived=organization.is_archived,
         )
 
@@ -363,11 +366,11 @@ class SqlAlchemyOrganizationRepository:
         statement = select(query.exists())
         return bool(await self._session.scalar(statement))
 
-    async def name_in_1c_exists(
-        self, normalized_name_in_1c: str, *, exclude_id: UUID | None = None
+    async def external_name_exists(
+        self, normalized_external_name: str, *, exclude_id: UUID | None = None
     ) -> bool:
         query = select(OrganizationModel.id).where(
-            OrganizationModel.normalized_name_in_1c == normalized_name_in_1c
+            OrganizationModel.normalized_external_name == normalized_external_name
         )
         if exclude_id is not None:
             query = query.where(OrganizationModel.id != exclude_id)

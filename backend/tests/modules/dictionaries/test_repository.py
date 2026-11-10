@@ -370,9 +370,9 @@ def test_get_organization_maps_model_to_domain(is_archived: bool) -> None:
         return_value=OrganizationModel(
             id=organization_id,
             name="Пример",
-            name_in_1c="ООО «Тестовая Компания»",
+            external_name="ООО «Тестовая Компания»",
             normalized_name="пример",
-            normalized_name_in_1c='ооо "тестовая компания"',
+            normalized_external_name='ооо "тестовая компания"',
             is_archived=is_archived,
         )
     )
@@ -383,7 +383,7 @@ def test_get_organization_maps_model_to_domain(is_archived: bool) -> None:
     assert organization == Organization(
         id=organization_id,
         name="Пример",
-        name_in_1c="ООО «Тестовая Компания»",
+        external_name="ООО «Тестовая Компания»",
         is_archived=is_archived,
     )
     session.get.assert_awaited_once_with(OrganizationModel, organization_id)
@@ -405,7 +405,7 @@ def test_add_organization_maps_domain_to_model(is_archived: bool) -> None:
     repository = SqlAlchemyOrganizationRepository(session)
     organization = Organization(
         name="  ПриМЕР  ",
-        name_in_1c="  ООО\u00a0«Тестовая   Компания»  ",
+        external_name="  ООО\u00a0«Тестовая   Компания»  ",
         is_archived=is_archived,
     )
 
@@ -416,9 +416,9 @@ def test_add_organization_maps_domain_to_model(is_archived: bool) -> None:
     assert isinstance(model, OrganizationModel)
     assert model.id == organization.id
     assert model.name == "ПриМЕР"
-    assert model.name_in_1c == "ООО «Тестовая Компания»"
+    assert model.external_name == "ООО «Тестовая Компания»"
     assert model.normalized_name == "пример"
-    assert model.normalized_name_in_1c == 'ооо "тестовая компания"'
+    assert model.normalized_external_name == 'ооо "тестовая компания"'
     assert model.is_archived is is_archived
     session.commit.assert_not_called()
 
@@ -429,7 +429,7 @@ def test_save_organization_merges_model(is_archived: bool) -> None:
     session.merge = AsyncMock()
     repository = SqlAlchemyOrganizationRepository(session)
     organization = Organization(
-        name="Пример", name_in_1c="ООО «Тестовая Компания»", is_archived=is_archived
+        name="Пример", external_name="ООО «Тестовая Компания»", is_archived=is_archived
     )
 
     asyncio.run(repository.save(organization))
@@ -439,9 +439,9 @@ def test_save_organization_merges_model(is_archived: bool) -> None:
     assert isinstance(model, OrganizationModel)
     assert model.id == organization.id
     assert model.name == organization.name
-    assert model.name_in_1c == organization.name_in_1c
+    assert model.external_name == organization.external_name
     assert model.normalized_name == organization.normalized_name
-    assert model.normalized_name_in_1c == organization.normalized_name_in_1c
+    assert model.normalized_external_name == organization.normalized_external_name
     assert model.is_archived is is_archived
     session.commit.assert_not_called()
 
@@ -455,9 +455,9 @@ def test_list_organizations_maps_models_and_filters_archived(include_archived: b
             OrganizationModel(
                 id=organization_id,
                 name="Пример",
-                name_in_1c="ООО «Тестовая Компания»",
+                external_name="ООО «Тестовая Компания»",
                 normalized_name="пример",
-                normalized_name_in_1c='ооо "тестовая компания"',
+                normalized_external_name='ооо "тестовая компания"',
                 is_archived=include_archived,
             )
         ]
@@ -470,7 +470,7 @@ def test_list_organizations_maps_models_and_filters_archived(include_archived: b
         Organization(
             id=organization_id,
             name="Пример",
-            name_in_1c="ООО «Тестовая Компания»",
+            external_name="ООО «Тестовая Компания»",
             is_archived=include_archived,
         )
     ]
@@ -514,15 +514,15 @@ def test_organization_name_existence_query(exclude_self: bool, exists: bool) -> 
 
 @pytest.mark.parametrize("exclude_self", [False, True])
 @pytest.mark.parametrize("exists", [False, True])
-def test_organization_1c_name_existence_query(exclude_self: bool, exists: bool) -> None:
+def test_organization_external_name_existence_query(exclude_self: bool, exists: bool) -> None:
     session = MagicMock(spec=AsyncSession)
     session.scalar = AsyncMock(return_value=exists)
     repository = SqlAlchemyOrganizationRepository(session)
     excluded_id = uuid4() if exclude_self else None
-    normalized_name_in_1c = 'ооо "тестовая компания"'
+    normalized_external_name = 'ооо "тестовая компания"'
 
     result = asyncio.run(
-        repository.name_in_1c_exists(normalized_name_in_1c, exclude_id=excluded_id)
+        repository.external_name_exists(normalized_external_name, exclude_id=excluded_id)
     )
 
     assert result is exists
@@ -530,9 +530,9 @@ def test_organization_1c_name_existence_query(exclude_self: bool, exists: bool) 
     statement = session.scalar.await_args.args[0]
     sql = str(statement)
     assert "EXISTS (SELECT organizations.id" in sql
-    assert "organizations.normalized_name_in_1c =" in sql
+    assert "organizations.normalized_external_name =" in sql
     assert "is_archived" not in sql
     assert ("organizations.id !=" in sql) is exclude_self
-    assert normalized_name_in_1c in statement.compile().params.values()
+    assert normalized_external_name in statement.compile().params.values()
     if excluded_id is not None:
         assert excluded_id in statement.compile().params.values()

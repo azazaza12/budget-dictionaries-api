@@ -13,7 +13,7 @@ from sigma.modules.dictionaries.domain import (
     InvalidDictionaryNameError,
     Organization,
     clean_name,
-    normalize_1c_name,
+    normalize_external_name,
     normalize_name,
 )
 
@@ -231,7 +231,7 @@ def test_mrp_archive_and_restore_are_idempotent() -> None:
 
 
 @pytest.mark.parametrize(
-    "name_in_1c",
+    "external_name",
     [
         'ООО "Тестовая Компания"',
         "ООО «Тестовая Компания»",
@@ -240,43 +240,45 @@ def test_mrp_archive_and_restore_are_idempotent() -> None:
         "  оОо\t«Тестовая\u00a0\u00a0Компания»\n",
     ],
 )
-def test_normalize_1c_name_ignores_case_whitespace_and_quote_style(name_in_1c: str) -> None:
-    assert normalize_1c_name(name_in_1c) == 'ооо "тестовая компания"'
+def test_normalize_external_name_ignores_case_whitespace_and_quote_style(
+    external_name: str,
+) -> None:
+    assert normalize_external_name(external_name) == 'ооо "тестовая компания"'
 
 
-@pytest.mark.parametrize("name_in_1c", ["", " \t\n ", "\u00a0"])
-def test_normalize_1c_name_rejects_empty_value(name_in_1c: str) -> None:
+@pytest.mark.parametrize("external_name", ["", " \t\n ", "\u00a0"])
+def test_normalize_external_name_rejects_empty_value(external_name: str) -> None:
     with pytest.raises(InvalidDictionaryNameError):
-        normalize_1c_name(name_in_1c)
+        normalize_external_name(external_name)
 
 
-def test_normalize_1c_name_preserves_legal_form_and_punctuation() -> None:
-    assert normalize_1c_name("ООО «Тестовая-Компания»") == 'ооо "тестовая-компания"'
+def test_normalize_external_name_preserves_legal_form_and_punctuation() -> None:
+    assert normalize_external_name("ООО «Тестовая-Компания»") == 'ооо "тестовая-компания"'
 
 
 def test_organization_cleans_fields_and_exposes_normalized_values() -> None:
     organization = Organization(
         name="  ПриМЕР\u00a0 ",
-        name_in_1c="  ООО\t«Тестовая\u00a0\u00a0Компания»\n",
+        external_name="  ООО\t«Тестовая\u00a0\u00a0Компания»\n",
     )
 
     assert organization.normalized_name == "пример"
-    assert organization.normalized_name_in_1c == 'ооо "тестовая компания"'
+    assert organization.normalized_external_name == 'ооо "тестовая компания"'
     assert organization.name == "ПриМЕР"
-    assert organization.name_in_1c == "ООО «Тестовая Компания»"
+    assert organization.external_name == "ООО «Тестовая Компания»"
     assert not organization.is_archived
 
 
 @pytest.mark.parametrize("empty_value", ["", " \t\n ", "\u00a0"])
 def test_organization_rejects_empty_name(empty_value: str) -> None:
     with pytest.raises(InvalidDictionaryNameError):
-        Organization(name=empty_value, name_in_1c="ООО «Образец»")
+        Organization(name=empty_value, external_name="ООО «Образец»")
 
 
 @pytest.mark.parametrize("empty_value", ["", " \t\n ", "\u00a0"])
-def test_organization_rejects_empty_name_in_1c(empty_value: str) -> None:
+def test_organization_rejects_empty_external_name(empty_value: str) -> None:
     with pytest.raises(InvalidDictionaryNameError):
-        Organization(name="Образец", name_in_1c=empty_value)
+        Organization(name="Образец", external_name=empty_value)
 
 
 @pytest.mark.parametrize("is_archived", [False, True])
@@ -285,7 +287,7 @@ def test_organization_archive_is_idempotent_and_preserves_identity(is_archived: 
     organization = Organization(
         id=organization_id,
         name="Образец",
-        name_in_1c="ООО «Образец»",
+        external_name="ООО «Образец»",
         is_archived=is_archived,
     )
 
@@ -295,7 +297,7 @@ def test_organization_archive_is_idempotent_and_preserves_identity(is_archived: 
     assert organization.is_archived
     assert organization.id == organization_id
     assert organization.name == "Образец"
-    assert organization.name_in_1c == "ООО «Образец»"
+    assert organization.external_name == "ООО «Образец»"
 
 
 @pytest.mark.parametrize("is_archived", [False, True])
@@ -304,7 +306,7 @@ def test_organization_restore_is_idempotent_and_preserves_identity(is_archived: 
     organization = Organization(
         id=organization_id,
         name="Образец",
-        name_in_1c="ООО «Образец»",
+        external_name="ООО «Образец»",
         is_archived=is_archived,
     )
 
@@ -314,52 +316,56 @@ def test_organization_restore_is_idempotent_and_preserves_identity(is_archived: 
     assert not organization.is_archived
     assert organization.id == organization_id
     assert organization.name == "Образец"
-    assert organization.name_in_1c == "ООО «Образец»"
+    assert organization.external_name == "ООО «Образец»"
 
 
 @pytest.mark.parametrize("is_archived", [False, True])
 def test_organization_rename_changes_only_internal_name(is_archived: bool) -> None:
-    organization = Organization(name="Образец", name_in_1c="ООО «Образец»", is_archived=is_archived)
+    organization = Organization(
+        name="Образец", external_name="ООО «Образец»", is_archived=is_archived
+    )
     original_id = organization.id
 
     organization.rename("  ПриМЕР\u00a0 ")
 
     assert organization.name == "ПриМЕР"
     assert organization.normalized_name == "пример"
-    assert organization.name_in_1c == "ООО «Образец»"
+    assert organization.external_name == "ООО «Образец»"
     assert organization.id == original_id
     assert organization.is_archived is is_archived
 
 
 @pytest.mark.parametrize("is_archived", [False, True])
-def test_organization_rename_in_1c_changes_only_1c_name(is_archived: bool) -> None:
-    organization = Organization(name="Образец", name_in_1c="ООО «Образец»", is_archived=is_archived)
+def test_organization_rename_external_name_changes_only_external_name(is_archived: bool) -> None:
+    organization = Organization(
+        name="Образец", external_name="ООО «Образец»", is_archived=is_archived
+    )
     original_id = organization.id
 
-    organization.rename_in_1c("  ООО\t«Тестовая-Компания»\u00a0 ")
+    organization.rename_external_name("  ООО\t«Тестовая-Компания»\u00a0 ")
 
     assert organization.name == "Образец"
-    assert organization.name_in_1c == "ООО «Тестовая-Компания»"
-    assert organization.normalized_name_in_1c == 'ооо "тестовая-компания"'
+    assert organization.external_name == "ООО «Тестовая-Компания»"
+    assert organization.normalized_external_name == 'ооо "тестовая-компания"'
     assert organization.id == original_id
     assert organization.is_archived is is_archived
 
 
-@pytest.mark.parametrize("rename_in_1c", [False, True])
+@pytest.mark.parametrize("rename_external_name", [False, True])
 @pytest.mark.parametrize("empty_value", ["", " \t\n ", "\u00a0"])
 def test_organization_rename_rejects_empty_values_without_mutation(
-    rename_in_1c: bool, empty_value: str
+    rename_external_name: bool, empty_value: str
 ) -> None:
-    organization = Organization(name="Образец", name_in_1c="ООО «Образец»", is_archived=True)
+    organization = Organization(name="Образец", external_name="ООО «Образец»", is_archived=True)
     original_id = organization.id
 
     with pytest.raises(InvalidDictionaryNameError):
-        if rename_in_1c:
-            organization.rename_in_1c(empty_value)
+        if rename_external_name:
+            organization.rename_external_name(empty_value)
         else:
             organization.rename(empty_value)
 
     assert organization.name == "Образец"
-    assert organization.name_in_1c == "ООО «Образец»"
+    assert organization.external_name == "ООО «Образец»"
     assert organization.id == original_id
     assert organization.is_archived

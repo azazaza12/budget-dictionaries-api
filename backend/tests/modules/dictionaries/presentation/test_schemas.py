@@ -61,7 +61,7 @@ def test_budget_article_category_input_parses_category_id() -> None:
         (BudgetArticleInput, {"name": "Авиабилеты", "category_id": uuid4()}),
         (BudgetArticleNameInput, {"name": "Авиабилеты"}),
         (BudgetArticleCategoryInput, {"category_id": uuid4()}),
-        (OrganizationInput, {"name": "Пример", "name_in_1c": "ООО «Тестовая Компания»"}),
+        (OrganizationInput, {"name": "Пример", "external_name": "ООО «Тестовая Компания»"}),
     ],
 )
 def test_input_schemas_reject_extra_fields(
@@ -150,10 +150,10 @@ def test_mrp_view_reads_attributes_without_exposing_normalized_name() -> None:
 
 
 def test_organization_input_accepts_both_names() -> None:
-    data = OrganizationInput(name="Пример", name_in_1c="ООО «Тестовая Компания»")
+    data = OrganizationInput(name="Пример", external_name="ООО «Тестовая Компания»")
 
     assert data.name == "Пример"
-    assert data.name_in_1c == "ООО «Тестовая Компания»"
+    assert data.external_name == "ООО «Тестовая Компания»"
 
 
 @pytest.mark.parametrize(
@@ -161,9 +161,9 @@ def test_organization_input_accepts_both_names() -> None:
     [
         {},
         {"name": "Пример"},
-        {"name_in_1c": "ООО «Тестовая Компания»"},
-        {"name": None, "name_in_1c": "ООО «Тестовая Компания»"},
-        {"name": "Пример", "name_in_1c": None},
+        {"external_name": "ООО «Тестовая Компания»"},
+        {"name": None, "external_name": "ООО «Тестовая Компания»"},
+        {"name": "Пример", "external_name": None},
     ],
 )
 def test_organization_input_requires_both_names(data: dict[str, object]) -> None:
@@ -176,7 +176,7 @@ def test_organization_view_reads_domain_without_exposing_normalized_names(
     is_archived: bool,
 ) -> None:
     organization = Organization(
-        name="Пример", name_in_1c="ООО «Тестовая Компания»", is_archived=is_archived
+        name="Пример", external_name="ООО «Тестовая Компания»", is_archived=is_archived
     )
 
     view = OrganizationView.model_validate(organization)
@@ -184,6 +184,6 @@ def test_organization_view_reads_domain_without_exposing_normalized_names(
     assert view.model_dump(mode="json") == {
         "id": str(organization.id),
         "name": "Пример",
-        "name_in_1c": "ООО «Тестовая Компания»",
+        "external_name": "ООО «Тестовая Компания»",
         "is_archived": is_archived,
     }

@@ -13,7 +13,7 @@ from sigma.modules.dictionaries.facade import (
     DictionariesDomainError,
     DictionariesFeatureError,
     DuplicateDictionaryNameError,
-    DuplicateOrganizationNameIn1CError,
+    DuplicateOrganizationExternalNameError,
     InvalidDictionaryNameError,
     MRPNotFoundError,
     OrganizationNotFoundError,
@@ -39,10 +39,10 @@ ORGANIZATION_ID = uuid4()
             {"organization_id": str(ORGANIZATION_ID)},
         ),
         (
-            DuplicateOrganizationNameIn1CError("ООО «Тестовая Компания»"),
+            DuplicateOrganizationExternalNameError("ООО «Тестовая Компания»"),
             409,
-            "duplicate_organization_name_in_1c",
-            {"name_in_1c": "ООО «Тестовая Компания»"},
+            "duplicate_organization_external_name",
+            {"external_name": "ООО «Тестовая Компания»"},
         ),
         (CFONotFoundError(CFO_ID), 404, "cfo_not_found", {"cfo_id": str(CFO_ID)}),
         (

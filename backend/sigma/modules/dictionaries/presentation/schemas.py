@@ -77,7 +77,7 @@ class OrganizationInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str
-    name_in_1c: str
+    external_name: str
 
 
 class OrganizationView(BaseModel):
@@ -85,5 +85,5 @@ class OrganizationView(BaseModel):
 
     id: UUID
     name: str
-    name_in_1c: str
+    external_name: str
     is_archived: bool

@@ -1,6 +1,12 @@
 from sqlalchemy import Table, UniqueConstraint
 
-from sigma.modules.dictionaries.models import BudgetArticleModel, CategoryModel, CFOModel, MRPModel
+from sigma.modules.dictionaries.models import (
+    BudgetArticleModel,
+    CategoryModel,
+    CFOModel,
+    MRPModel,
+    OrganizationModel,
+)
 
 
 def test_mrp_model_schema() -> None:
@@ -87,3 +93,32 @@ def test_budget_article_category_foreign_key_restricts_deletion() -> None:
     foreign_key = next(iter(foreign_keys))
     assert foreign_key.target_fullname == "budget_categories.id"
     assert foreign_key.ondelete == "RESTRICT"
+
+
+def test_organization_model_schema() -> None:
+    table = OrganizationModel.__table__
+    assert isinstance(table, Table)
+
+    assert OrganizationModel.__tablename__ == "organizations"
+    assert set(table.columns.keys()) == {
+        "id",
+        "name",
+        "external_name",
+        "normalized_name",
+        "normalized_external_name",
+        "is_archived",
+    }
+    assert table.c.id.primary_key
+    assert all(not column.nullable for column in table.columns)
+    assert table.c.is_archived.default is not None
+    assert table.c.is_archived.server_default is not None
+    assert str(table.c.is_archived.server_default.arg) == "false"
+    unique_constraints = {
+        constraint.name: list(constraint.columns.keys())
+        for constraint in table.constraints
+        if isinstance(constraint, UniqueConstraint)
+    }
+    assert unique_constraints == {
+        "uq_organizations_normalized_name": ["normalized_name"],
+        "uq_organizations_normalized_external_name": ["normalized_external_name"],
+    }

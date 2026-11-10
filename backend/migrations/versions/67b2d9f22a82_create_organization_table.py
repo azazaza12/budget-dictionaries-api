@@ -22,14 +22,14 @@ def upgrade() -> None:
         "organizations",
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column("name", sa.Text(), nullable=False),
-        sa.Column("name_in_1c", sa.Text(), nullable=False),
+        sa.Column("external_name", sa.Text(), nullable=False),
         sa.Column("is_archived", sa.Boolean(), server_default=sa.text("false"), nullable=False),
-        sa.Column("normalized_name_in_1c", sa.Text(), nullable=False),
+        sa.Column("normalized_external_name", sa.Text(), nullable=False),
         sa.Column("normalized_name", sa.Text(), nullable=False),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_organizations")),
         sa.UniqueConstraint("normalized_name", name=op.f("uq_organizations_normalized_name")),
         sa.UniqueConstraint(
-            "normalized_name_in_1c", name=op.f("uq_organizations_normalized_name_in_1c")
+            "normalized_external_name", name=op.f("uq_organizations_normalized_external_name")
         ),
     )
     # ### end Alembic commands ###

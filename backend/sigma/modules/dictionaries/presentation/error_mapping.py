@@ -11,7 +11,7 @@ from sigma.modules.dictionaries.facade import (
     DictionariesDomainError,
     DictionariesFeatureError,
     DuplicateDictionaryNameError,
-    DuplicateOrganizationNameIn1CError,
+    DuplicateOrganizationExternalNameError,
     InvalidDictionaryNameError,
     MRPNotFoundError,
     OrganizationNotFoundError,
@@ -27,7 +27,7 @@ ERROR_STATUSES: dict[type[Exception], int] = {
     ArticleCategoryMismatchError: status.HTTP_409_CONFLICT,
     InvalidDictionaryNameError: status.HTTP_422_UNPROCESSABLE_CONTENT,
     OrganizationNotFoundError: status.HTTP_404_NOT_FOUND,
-    DuplicateOrganizationNameIn1CError: status.HTTP_409_CONFLICT,
+    DuplicateOrganizationExternalNameError: status.HTTP_409_CONFLICT,
 }
 
 

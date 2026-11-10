@@ -14,12 +14,12 @@ class DuplicateDictionaryNameError(DictionariesFeatureError):
         super().__init__(f"Dictionary name '{name}' already exists")
 
 
-class DuplicateOrganizationNameIn1CError(DictionariesFeatureError):
-    code = "duplicate_organization_name_in_1c"
+class DuplicateOrganizationExternalNameError(DictionariesFeatureError):
+    code = "duplicate_organization_external_name"
 
-    def __init__(self, name_in_1c: str) -> None:
-        self.name_in_1c = name_in_1c
-        super().__init__(f"Organization name in 1C '{name_in_1c}' already exists")
+    def __init__(self, external_name: str) -> None:
+        self.external_name = external_name
+        super().__init__(f"Organization external name '{external_name}' already exists")
 
 
 class OrganizationNotFoundError(DictionariesFeatureError):

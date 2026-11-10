@@ -48,7 +48,7 @@ def normalize_name(value: str) -> str:
     return clean_name(value).casefold()
 
 
-def normalize_1c_name(value: str) -> str:
+def normalize_external_name(value: str) -> str:
     cleaned_name = clean_name(value)
     quote_translation = str.maketrans({"«": '"', "»": '"', "“": '"', "”": '"', "„": '"'})
     return cleaned_name.translate(quote_translation).casefold()
@@ -122,19 +122,19 @@ class CFO(BaseDictionary):
 
 @dataclass(slots=True, kw_only=True)
 class Organization(BaseDictionary):
-    name_in_1c: str
+    external_name: str
 
     def __post_init__(self) -> None:
         self.name = clean_name(self.name)
-        self.name_in_1c = clean_name(self.name_in_1c)
+        self.external_name = clean_name(self.external_name)
 
     @property
-    def normalized_name_in_1c(self) -> str:
-        return normalize_1c_name(self.name_in_1c)
+    def normalized_external_name(self) -> str:
+        return normalize_external_name(self.external_name)
 
     def restore(self) -> None:
         self.is_archived = False
 
-    def rename_in_1c(self, new_name: str) -> None:
+    def rename_external_name(self, new_name: str) -> None:
         cleaned_name = clean_name(new_name)
-        self.name_in_1c = cleaned_name
+        self.external_name = cleaned_name

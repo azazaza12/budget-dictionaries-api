@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from sigma.modules.dictionaries.facade import (
     DictionariesFacade,
     DuplicateDictionaryNameError,
-    DuplicateOrganizationNameIn1CError,
+    DuplicateOrganizationExternalNameError,
     InvalidDictionaryNameError,
     OrganizationNotFoundError,
 )
@@ -50,20 +50,20 @@ def test_create_organization_returns_created_organization(
     organization_api: OrganizationApi,
 ) -> None:
     organization = SimpleNamespace(
-        id=uuid4(), name="Пример", name_in_1c="ООО «Тестовая Компания»", is_archived=False
+        id=uuid4(), name="Пример", external_name="ООО «Тестовая Компания»", is_archived=False
     )
     organization_api.dictionaries.create_organization = AsyncMock(return_value=organization)
 
     response = organization_api.client.post(
         "/dictionaries/organizations",
-        json={"name": "Пример", "name_in_1c": "ООО «Тестовая Компания»"},
+        json={"name": "Пример", "external_name": "ООО «Тестовая Компания»"},
     )
 
     assert response.status_code == 201
     assert response.json() == {
         "id": str(organization.id),
         "name": "Пример",
-        "name_in_1c": "ООО «Тестовая Компания»",
+        "external_name": "ООО «Тестовая Компания»",
         "is_archived": False,
     }
     organization_api.dictionaries.create_organization.assert_awaited_once_with(
@@ -77,20 +77,20 @@ def test_rename_organization_returns_updated_organization(
     is_archived: bool, organization_api: OrganizationApi
 ) -> None:
     organization = SimpleNamespace(
-        id=uuid4(), name="Пример", name_in_1c="ООО «Тестовая Компания»", is_archived=is_archived
+        id=uuid4(), name="Пример", external_name="ООО «Тестовая Компания»", is_archived=is_archived
     )
     organization_api.dictionaries.rename_organization = AsyncMock(return_value=organization)
 
     response = organization_api.client.put(
         f"/dictionaries/organizations/{organization.id}",
-        json={"name": "Пример", "name_in_1c": "ООО «Тестовая Компания»"},
+        json={"name": "Пример", "external_name": "ООО «Тестовая Компания»"},
     )
 
     assert response.status_code == 200
     assert response.json() == {
         "id": str(organization.id),
         "name": "Пример",
-        "name_in_1c": "ООО «Тестовая Компания»",
+        "external_name": "ООО «Тестовая Компания»",
         "is_archived": is_archived,
     }
     organization_api.dictionaries.rename_organization.assert_awaited_once_with(
@@ -101,7 +101,7 @@ def test_rename_organization_returns_updated_organization(
 
 def test_list_organizations_excludes_archived_by_default(organization_api: OrganizationApi) -> None:
     organization = SimpleNamespace(
-        id=uuid4(), name="Пример", name_in_1c="ООО «Тестовая Компания»", is_archived=False
+        id=uuid4(), name="Пример", external_name="ООО «Тестовая Компания»", is_archived=False
     )
     organization_api.dictionaries.list_organizations = AsyncMock(return_value=[organization])
 
@@ -112,7 +112,7 @@ def test_list_organizations_excludes_archived_by_default(organization_api: Organ
         {
             "id": str(organization.id),
             "name": "Пример",
-            "name_in_1c": "ООО «Тестовая Компания»",
+            "external_name": "ООО «Тестовая Компания»",
             "is_archived": False,
         }
     ]
@@ -129,7 +129,7 @@ def test_list_organizations_forwards_query_filter(
     organization = SimpleNamespace(
         id=uuid4(),
         name="Пример",
-        name_in_1c="ООО «Тестовая Компания»",
+        external_name="ООО «Тестовая Компания»",
         is_archived=include_archived,
     )
     organization_api.dictionaries.list_organizations = AsyncMock(return_value=[organization])
@@ -179,7 +179,7 @@ def test_change_organization_archive_state(
     organization = SimpleNamespace(
         id=uuid4(),
         name="Пример",
-        name_in_1c="ООО «Тестовая Компания»",
+        external_name="ООО «Тестовая Компания»",
         is_archived=is_archived,
     )
     operation = AsyncMock(return_value=organization)
@@ -193,7 +193,7 @@ def test_change_organization_archive_state(
     assert response.json() == {
         "id": str(organization.id),
         "name": "Пример",
-        "name_in_1c": "ООО «Тестовая Компания»",
+        "external_name": "ООО «Тестовая Компания»",
         "is_archived": is_archived,
     }
     operation.assert_awaited_once_with(organization.id)
@@ -210,7 +210,7 @@ def test_missing_organization_returns_404(action: str, organization_api: Organiz
     response = organization_api.client.request(
         "put" if action == "rename" else "post",
         f"/dictionaries/organizations/{organization_id}{suffix}",
-        json={"name": "Пример", "name_in_1c": "ООО «Пример»"},
+        json={"name": "Пример", "external_name": "ООО «Пример»"},
     )
 
     assert response.status_code == 404
@@ -235,10 +235,10 @@ def test_missing_organization_returns_404(action: str, organization_api: Organiz
             {"name": "Пример"},
         ),
         (
-            DuplicateOrganizationNameIn1CError("ООО «Тестовая Компания»"),
+            DuplicateOrganizationExternalNameError("ООО «Тестовая Компания»"),
             409,
-            "duplicate_organization_name_in_1c",
-            {"name_in_1c": "ООО «Тестовая Компания»"},
+            "duplicate_organization_external_name",
+            {"external_name": "ООО «Тестовая Компания»"},
         ),
         (InvalidDictionaryNameError("Empty name"), 422, "invalid_dictionary_name", {}),
     ],
@@ -261,7 +261,7 @@ def test_organization_name_errors(
     response = organization_api.client.request(
         "put" if rename else "post",
         f"/dictionaries/organizations{suffix}",
-        json={"name": "Пример", "name_in_1c": "ООО «Тестовая Компания»"},
+        json={"name": "Пример", "external_name": "ООО «Тестовая Компания»"},
     )
 
     assert response.status_code == expected_status
@@ -278,10 +278,10 @@ def test_organization_name_errors(
     [
         {},
         {"name": "Пример"},
-        {"name_in_1c": "ООО «Тестовая Компания»"},
-        {"name": None, "name_in_1c": "ООО «Тестовая Компания»"},
-        {"name": "Пример", "name_in_1c": None},
-        {"name": "Пример", "name_in_1c": "ООО «Тестовая Компания»", "is_archived": True},
+        {"external_name": "ООО «Тестовая Компания»"},
+        {"name": None, "external_name": "ООО «Тестовая Компания»"},
+        {"name": "Пример", "external_name": None},
+        {"name": "Пример", "external_name": "ООО «Тестовая Компания»", "is_archived": True},
     ],
 )
 def test_invalid_organization_input_does_not_call_facade(
@@ -311,7 +311,7 @@ def test_invalid_organization_id_does_not_call_facade(
     response = organization_api.client.request(
         "put" if action == "rename" else "post",
         f"/dictionaries/organizations/not-a-uuid{suffix}",
-        json={"name": "Пример", "name_in_1c": "ООО «Пример»"},
+        json={"name": "Пример", "external_name": "ООО «Пример»"},
     )
 
     assert response.status_code == 422
@@ -337,7 +337,7 @@ def test_organization_writes_respect_admin_dependency(
     response = organization_api.client.request(
         method,
         f"/dictionaries/organizations{suffix.format(id=uuid4())}",
-        json={"name": "Пример", "name_in_1c": "ООО «Тестовая Компания»"},
+        json={"name": "Пример", "external_name": "ООО «Тестовая Компания»"},
     )
 
     assert response.status_code == 403

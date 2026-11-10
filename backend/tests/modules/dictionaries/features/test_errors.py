@@ -7,7 +7,7 @@ from sigma.modules.dictionaries.features.errors import (
     CategoryNotFoundError,
     DictionariesFeatureError,
     DuplicateDictionaryNameError,
-    DuplicateOrganizationNameIn1CError,
+    DuplicateOrganizationExternalNameError,
     MRPNotFoundError,
     OrganizationNotFoundError,
 )
@@ -20,7 +20,7 @@ from sigma.modules.dictionaries.features.errors import (
         (CategoryNotFoundError, "category_not_found"),
         (BudgetArticleNotFoundError, "budget_article_not_found"),
         (MRPNotFoundError, "mrp_not_found"),
-        (DuplicateOrganizationNameIn1CError, "duplicate_organization_name_in_1c"),
+        (DuplicateOrganizationExternalNameError, "duplicate_organization_external_name"),
         (OrganizationNotFoundError, "organization_not_found"),
     ],
 )
@@ -37,11 +37,11 @@ def test_duplicate_name_error_exposes_name() -> None:
     assert error.name == "Авиабилеты"
 
 
-def test_duplicate_organization_1c_name_error_exposes_name_in_1c() -> None:
-    error = DuplicateOrganizationNameIn1CError("ООО «Тестовая Компания»")
+def test_duplicate_organization_external_name_error_exposes_external_name() -> None:
+    error = DuplicateOrganizationExternalNameError("ООО «Тестовая Компания»")
 
-    assert error.name_in_1c == "ООО «Тестовая Компания»"
-    assert error.name_in_1c in str(error)
+    assert error.external_name == "ООО «Тестовая Компания»"
+    assert error.external_name in str(error)
 
 
 def test_organization_not_found_error_exposes_organization_id() -> None:

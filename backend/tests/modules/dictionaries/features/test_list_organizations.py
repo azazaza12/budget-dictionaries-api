@@ -10,7 +10,7 @@ from sigma.modules.dictionaries.repository import OrganizationRepository
 
 @pytest.mark.parametrize("include_archived", [False, True])
 def test_list_organizations_forwards_archive_filter(include_archived: bool) -> None:
-    organizations = [Organization(name="Пример", name_in_1c="ООО «Тестовая Компания»")]
+    organizations = [Organization(name="Пример", external_name="ООО «Тестовая Компания»")]
     repository = MagicMock(spec=OrganizationRepository)
     repository.list = AsyncMock(return_value=organizations)
 
