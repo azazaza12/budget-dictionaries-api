@@ -11,27 +11,33 @@ from .domain import (
     Category,
     DictionariesDomainError,
     InvalidDictionaryNameError,
+    Organization,
 )
 from .features.archive_article import archive_article as archive_article_feature
 from .features.archive_category import archive_category as archive_category_feature
 from .features.archive_cfo import archive_cfo as archive_cfo_feature
 from .features.archive_mrp import archive_mrp as archive_mrp_feature
+from .features.archive_organization import archive_organization as archive_organization_feature
 from .features.create_article import create_article as create_article_feature
 from .features.create_category import create_category as create_category_feature
 from .features.create_cfo import create_cfo as create_cfo_feature
 from .features.create_mrp import create_mrp as create_mrp_feature
+from .features.create_organization import create_organization as create_organization_feature
 from .features.errors import (
     BudgetArticleNotFoundError,
     CategoryNotFoundError,
     CFONotFoundError,
     DictionariesFeatureError,
     DuplicateDictionaryNameError,
+    DuplicateOrganizationNameIn1CError,
     MRPNotFoundError,
+    OrganizationNotFoundError,
 )
 from .features.list_articles import list_articles as list_articles_feature
 from .features.list_categories import list_categories as list_categories_feature
 from .features.list_cfos import list_cfos as list_cfos_feature
 from .features.list_mrps import list_mrps as list_mrps_feature
+from .features.list_organizations import list_organizations as list_organizations_feature
 from .features.move_article import move_article as move_article_feature
 from .features.rename_article import rename_article as rename_article_feature
 from .features.rename_category import rename_category as rename_category_feature
@@ -41,11 +47,13 @@ from .features.restore_article import restore_article as restore_article_feature
 from .features.restore_category import restore_category as restore_category_feature
 from .features.restore_cfo import restore_cfo as restore_cfo_feature
 from .features.restore_mrp import restore_mrp as restore_mrp_feature
+from .features.restore_organization import restore_organization as restore_organization_feature
 from .repository import (
     SqlAlchemyBudgetArticleRepository,
     SqlAlchemyCategoryRepository,
     SqlAlchemyCFORepository,
     SqlAlchemyMRPRepository,
+    SqlAlchemyOrganizationRepository,
 )
 
 __all__ = (
@@ -58,8 +66,10 @@ __all__ = (
     "DictionariesFacade",
     "DictionariesFeatureError",
     "DuplicateDictionaryNameError",
+    "DuplicateOrganizationNameIn1CError",
     "InvalidDictionaryNameError",
     "MRPNotFoundError",
+    "OrganizationNotFoundError",
 )
 
 
@@ -70,6 +80,7 @@ class DictionariesFacade:
         self._article_repository = SqlAlchemyBudgetArticleRepository(session)
         self._mrp_repository = SqlAlchemyMRPRepository(session)
         self._cfo_repository = SqlAlchemyCFORepository(session)
+        self._organization_repository = SqlAlchemyOrganizationRepository(session)
 
     async def create_category(self, name: str) -> Category:
         async with self._session.begin():
@@ -186,3 +197,22 @@ class DictionariesFacade:
 
     async def list_cfos(self, *, include_archived: bool = False) -> list[CFO]:
         return await list_cfos_feature(self._cfo_repository, include_archived=include_archived)
+
+    async def create_organization(self, name: str, name_in_1c: str) -> Organization:
+        async with self._session.begin():
+            return await create_organization_feature(
+                name, name_in_1c, self._organization_repository
+            )
+
+    async def archive_organization(self, id: UUID) -> Organization:
+        async with self._session.begin():
+            return await archive_organization_feature(id, self._organization_repository)
+
+    async def restore_organization(self, id: UUID) -> Organization:
+        async with self._session.begin():
+            return await restore_organization_feature(id, self._organization_repository)
+
+    async def list_organizations(self, *, include_archived: bool = False) -> list[Organization]:
+        return await list_organizations_feature(
+            self._organization_repository, include_archived=include_archived
+        )
