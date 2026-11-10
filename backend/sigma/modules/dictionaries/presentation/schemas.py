@@ -71,3 +71,19 @@ class BudgetArticleView(BaseModel):
     name: str
     category_id: UUID
     is_archived: bool
+
+
+class OrganizationInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    name_in_1c: str
+
+
+class OrganizationView(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    name_in_1c: str
+    is_archived: bool

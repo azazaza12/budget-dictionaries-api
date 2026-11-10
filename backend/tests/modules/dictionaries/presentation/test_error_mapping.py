@@ -13,8 +13,10 @@ from sigma.modules.dictionaries.facade import (
     DictionariesDomainError,
     DictionariesFeatureError,
     DuplicateDictionaryNameError,
+    DuplicateOrganizationNameIn1CError,
     InvalidDictionaryNameError,
     MRPNotFoundError,
+    OrganizationNotFoundError,
 )
 from sigma.modules.dictionaries.presentation.error_mapping import dictionaries_error
 
@@ -24,11 +26,24 @@ EXPECTED_CATEGORY_ID = uuid4()
 PROVIDED_CATEGORY_ID = uuid4()
 MRP_ID = uuid4()
 CFO_ID = uuid4()
+ORGANIZATION_ID = uuid4()
 
 
 @pytest.mark.parametrize(
     ("error", "expected_status", "expected_code", "expected_context"),
     [
+        (
+            OrganizationNotFoundError(ORGANIZATION_ID),
+            404,
+            "organization_not_found",
+            {"organization_id": str(ORGANIZATION_ID)},
+        ),
+        (
+            DuplicateOrganizationNameIn1CError("ООО «Тестовая Компания»"),
+            409,
+            "duplicate_organization_name_in_1c",
+            {"name_in_1c": "ООО «Тестовая Компания»"},
+        ),
         (CFONotFoundError(CFO_ID), 404, "cfo_not_found", {"cfo_id": str(CFO_ID)}),
         (
             MRPNotFoundError(MRP_ID),

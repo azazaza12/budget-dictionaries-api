@@ -4,6 +4,7 @@ from uuid import uuid4
 import pytest
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
+from sigma.modules.dictionaries.domain import Organization
 from sigma.modules.dictionaries.presentation.schemas import (
     BudgetArticleCategoryInput,
     BudgetArticleInput,
@@ -15,6 +16,8 @@ from sigma.modules.dictionaries.presentation.schemas import (
     CFOView,
     MRPInput,
     MRPView,
+    OrganizationInput,
+    OrganizationView,
 )
 
 
@@ -58,6 +61,7 @@ def test_budget_article_category_input_parses_category_id() -> None:
         (BudgetArticleInput, {"name": "Авиабилеты", "category_id": uuid4()}),
         (BudgetArticleNameInput, {"name": "Авиабилеты"}),
         (BudgetArticleCategoryInput, {"category_id": uuid4()}),
+        (OrganizationInput, {"name": "Пример", "name_in_1c": "ООО «Тестовая Компания»"}),
     ],
 )
 def test_input_schemas_reject_extra_fields(
@@ -142,4 +146,44 @@ def test_mrp_view_reads_attributes_without_exposing_normalized_name() -> None:
         "id": str(mrp_id),
         "name": "Иванов",
         "is_archived": True,
+    }
+
+
+def test_organization_input_accepts_both_names() -> None:
+    data = OrganizationInput(name="Пример", name_in_1c="ООО «Тестовая Компания»")
+
+    assert data.name == "Пример"
+    assert data.name_in_1c == "ООО «Тестовая Компания»"
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        {},
+        {"name": "Пример"},
+        {"name_in_1c": "ООО «Тестовая Компания»"},
+        {"name": None, "name_in_1c": "ООО «Тестовая Компания»"},
+        {"name": "Пример", "name_in_1c": None},
+    ],
+)
+def test_organization_input_requires_both_names(data: dict[str, object]) -> None:
+    with pytest.raises(ValidationError):
+        OrganizationInput.model_validate(data)
+
+
+@pytest.mark.parametrize("is_archived", [False, True])
+def test_organization_view_reads_domain_without_exposing_normalized_names(
+    is_archived: bool,
+) -> None:
+    organization = Organization(
+        name="Пример", name_in_1c="ООО «Тестовая Компания»", is_archived=is_archived
+    )
+
+    view = OrganizationView.model_validate(organization)
+
+    assert view.model_dump(mode="json") == {
+        "id": str(organization.id),
+        "name": "Пример",
+        "name_in_1c": "ООО «Тестовая Компания»",
+        "is_archived": is_archived,
     }
