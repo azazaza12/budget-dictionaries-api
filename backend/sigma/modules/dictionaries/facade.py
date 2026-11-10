@@ -43,6 +43,7 @@ from .features.rename_article import rename_article as rename_article_feature
 from .features.rename_category import rename_category as rename_category_feature
 from .features.rename_cfo import rename_cfo as rename_cfo_feature
 from .features.rename_mrp import rename_mrp as rename_mrp_feature
+from .features.rename_organization import rename_organization as rename_organization_feature
 from .features.restore_article import restore_article as restore_article_feature
 from .features.restore_category import restore_category as restore_category_feature
 from .features.restore_cfo import restore_cfo as restore_cfo_feature
@@ -216,3 +217,11 @@ class DictionariesFacade:
         return await list_organizations_feature(
             self._organization_repository, include_archived=include_archived
         )
+
+    async def rename_organization(
+        self, id: UUID, new_name: str, new_name_in_1c: str
+    ) -> Organization:
+        async with self._session.begin():
+            return await rename_organization_feature(
+                id, new_name, new_name_in_1c, self._organization_repository
+            )

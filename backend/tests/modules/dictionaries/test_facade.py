@@ -654,6 +654,58 @@ def test_create_organization_runs_feature_in_transaction() -> None:
     _assert_successful_transaction(session, transaction)
 
 
+def test_rename_organization_runs_feature_in_transaction() -> None:
+    session, transaction = _session_with_transaction()
+    organization = Organization(name="Пример", name_in_1c="ООО «Тестовая Компания»")
+    feature = AsyncMock(return_value=organization)
+
+    with patch("sigma.modules.dictionaries.facade.rename_organization_feature", feature):
+        result = asyncio.run(
+            DictionariesFacade(session).rename_organization(
+                organization.id, organization.name, organization.name_in_1c
+            )
+        )
+
+    assert result is organization
+    feature.assert_awaited_once()
+    (organization_id, name, name_in_1c, repository), _ = _awaited_call(feature)
+    assert organization_id == organization.id
+    assert name == organization.name
+    assert name_in_1c == organization.name_in_1c
+    assert isinstance(repository, SqlAlchemyOrganizationRepository)
+    _assert_successful_transaction(session, transaction)
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        OrganizationNotFoundError(uuid4()),
+        DuplicateDictionaryNameError("Пример"),
+        DuplicateOrganizationNameIn1CError("ООО «Пример»"),
+        facade_module.InvalidDictionaryNameError("Empty name"),
+    ],
+)
+def test_rename_organization_error_exits_transaction_unchanged(error: Exception) -> None:
+    session, transaction = _session_with_transaction()
+    feature = AsyncMock(side_effect=error)
+
+    with (
+        patch("sigma.modules.dictionaries.facade.rename_organization_feature", feature),
+        pytest.raises(type(error)) as caught,
+    ):
+        asyncio.run(DictionariesFacade(session).rename_organization(uuid4(), "Пример", "ООО «Пример»"))
+
+    assert caught.value is error
+    feature.assert_awaited_once()
+    session.begin.assert_called_once_with()
+    transaction.__aenter__.assert_awaited_once_with()
+    transaction.__aexit__.assert_awaited_once()
+    exit_args = transaction.__aexit__.await_args.args
+    assert exit_args[0] is type(error)
+    assert exit_args[1] is error
+    assert exit_args[2] is not None
+
+
 @pytest.mark.parametrize("restore", [False, True])
 def test_organization_archive_and_restore_run_in_transaction(restore: bool) -> None:
     session, transaction = _session_with_transaction()

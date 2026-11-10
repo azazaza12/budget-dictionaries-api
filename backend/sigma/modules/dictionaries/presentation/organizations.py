@@ -41,3 +41,13 @@ async def list_organizations(
 ) -> list[OrganizationView]:
     organizations = await dictionaries.list_organizations(include_archived=include_archived)
     return [OrganizationView.model_validate(organization) for organization in organizations]
+
+
+@router.put("/{organization_id}", dependencies=[Depends(require_dictionaries_admin)])
+async def rename_organization(
+    organization_id: UUID, data: OrganizationInput, dictionaries: DictionariesFacadeDependency
+) -> OrganizationView:
+    organization = await dictionaries.rename_organization(
+        organization_id, data.name, data.name_in_1c
+    )
+    return OrganizationView.model_validate(organization)

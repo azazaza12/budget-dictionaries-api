@@ -57,6 +57,7 @@ def test_application_exposes_all_dictionary_routes(dictionaries_api: Dictionarie
         "/dictionaries/mrps/{mrp_id}/archive": {"post"},
         "/dictionaries/mrps/{mrp_id}/restore": {"post"},
         "/dictionaries/organizations": {"get", "post"},
+        "/dictionaries/organizations/{organization_id}": {"put"},
         "/dictionaries/organizations/{organization_id}/archive": {"post"},
         "/dictionaries/organizations/{organization_id}/restore": {"post"},
     }

@@ -135,5 +135,6 @@ class Organization(BaseDictionary):
     def restore(self) -> None:
         self.is_archived = False
 
-    def rename(self, new_name: str) -> None:
-        raise NotImplementedError("Organization renaming rules are not defined yet")
+    def rename_in_1c(self, new_name: str) -> None:
+        cleaned_name = clean_name(new_name)
+        self.name_in_1c = cleaned_name

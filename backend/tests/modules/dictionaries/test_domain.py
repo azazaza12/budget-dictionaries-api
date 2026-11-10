@@ -317,13 +317,49 @@ def test_organization_restore_is_idempotent_and_preserves_identity(is_archived: 
     assert organization.name_in_1c == "ООО «Образец»"
 
 
-def test_organization_rename_is_not_implemented_and_preserves_name() -> None:
-    organization = Organization(name="Образец", name_in_1c="ООО «Образец»")
+@pytest.mark.parametrize("is_archived", [False, True])
+def test_organization_rename_changes_only_internal_name(is_archived: bool) -> None:
+    organization = Organization(name="Образец", name_in_1c="ООО «Образец»", is_archived=is_archived)
+    original_id = organization.id
 
-    with pytest.raises(
-        NotImplementedError, match="Organization renaming rules are not defined yet"
-    ):
-        organization.rename("Другое название")
+    organization.rename("  ПриМЕР\u00a0 ")
+
+    assert organization.name == "ПриМЕР"
+    assert organization.normalized_name == "пример"
+    assert organization.name_in_1c == "ООО «Образец»"
+    assert organization.id == original_id
+    assert organization.is_archived is is_archived
+
+
+@pytest.mark.parametrize("is_archived", [False, True])
+def test_organization_rename_in_1c_changes_only_1c_name(is_archived: bool) -> None:
+    organization = Organization(name="Образец", name_in_1c="ООО «Образец»", is_archived=is_archived)
+    original_id = organization.id
+
+    organization.rename_in_1c("  ООО\t«Тестовая-Компания»\u00a0 ")
+
+    assert organization.name == "Образец"
+    assert organization.name_in_1c == "ООО «Тестовая-Компания»"
+    assert organization.normalized_name_in_1c == 'ооо "тестовая-компания"'
+    assert organization.id == original_id
+    assert organization.is_archived is is_archived
+
+
+@pytest.mark.parametrize("rename_in_1c", [False, True])
+@pytest.mark.parametrize("empty_value", ["", " \t\n ", "\u00a0"])
+def test_organization_rename_rejects_empty_values_without_mutation(
+    rename_in_1c: bool, empty_value: str
+) -> None:
+    organization = Organization(name="Образец", name_in_1c="ООО «Образец»", is_archived=True)
+    original_id = organization.id
+
+    with pytest.raises(InvalidDictionaryNameError):
+        if rename_in_1c:
+            organization.rename_in_1c(empty_value)
+        else:
+            organization.rename(empty_value)
 
     assert organization.name == "Образец"
     assert organization.name_in_1c == "ООО «Образец»"
+    assert organization.id == original_id
+    assert organization.is_archived
