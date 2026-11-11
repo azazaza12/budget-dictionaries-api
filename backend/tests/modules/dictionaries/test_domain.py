@@ -1,4 +1,4 @@
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -54,6 +54,33 @@ def test_domain_errors_have_stable_codes(
     expected_code: str,
 ) -> None:
     assert error_type.code == expected_code
+
+
+@pytest.mark.parametrize("use_keywords", [False, True])
+@pytest.mark.parametrize(
+    ("error_type", "field_names"),
+    [
+        (ArchivedCategoryError, ("category_id",)),
+        (ArchivedCFOError, ("cfo_id",)),
+        (ArchivedBudgetArticleError, ("article_id",)),
+        (ArchivedMRPError, ("mrp_id",)),
+        (
+            ArticleCategoryMismatchError,
+            ("article_id", "expected_category_id", "provided_category_id"),
+        ),
+    ],
+)
+def test_domain_errors_expose_explicit_fields(
+    use_keywords: bool,
+    error_type: type[DictionariesDomainError],
+    field_names: tuple[str, ...],
+) -> None:
+    context: dict[str, UUID] = {name: uuid4() for name in field_names}
+
+    error = error_type(**context) if use_keywords else error_type(*context.values())
+
+    assert vars(error) == context
+    assert error != error_type(**context)
 
 
 @pytest.fixture

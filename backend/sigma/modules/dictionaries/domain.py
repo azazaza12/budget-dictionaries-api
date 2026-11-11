@@ -13,38 +13,41 @@ class InvalidDictionaryNameError(DictionariesDomainError):
 
 class ArchivedCategoryError(DictionariesDomainError):
     code = "archived_category"
+    category_id: UUID
 
     def __init__(self, category_id: UUID) -> None:
         self.category_id = category_id
-        super().__init__(f"Category {category_id} is archived")
 
 
 class ArchivedCFOError(DictionariesDomainError):
     code = "archived_cfo"
+    cfo_id: UUID
 
     def __init__(self, cfo_id: UUID) -> None:
         self.cfo_id = cfo_id
-        super().__init__(f"CFO {cfo_id} is archived")
 
 
 class ArchivedBudgetArticleError(DictionariesDomainError):
     code = "archived_budget_article"
+    article_id: UUID
 
     def __init__(self, article_id: UUID) -> None:
         self.article_id = article_id
-        super().__init__(f"Budget article {article_id} is archived")
 
 
 class ArchivedMRPError(DictionariesDomainError):
     code = "archived_mrp"
+    mrp_id: UUID
 
     def __init__(self, mrp_id: UUID) -> None:
         self.mrp_id = mrp_id
-        super().__init__(f"MRP {mrp_id} is archived")
 
 
 class ArticleCategoryMismatchError(DictionariesDomainError):
     code = "article_category_mismatch"
+    article_id: UUID
+    expected_category_id: UUID
+    provided_category_id: UUID
 
     def __init__(
         self,
@@ -55,10 +58,6 @@ class ArticleCategoryMismatchError(DictionariesDomainError):
         self.article_id = article_id
         self.expected_category_id = expected_category_id
         self.provided_category_id = provided_category_id
-        super().__init__(
-            f"Article {article_id} belongs to category {expected_category_id}, "
-            f"not {provided_category_id}"
-        )
 
 
 def clean_name(value: str) -> str:

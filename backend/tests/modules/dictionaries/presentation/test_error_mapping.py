@@ -5,14 +5,19 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from sigma.modules.dictionaries.facade import (
+    ArchivedBudgetArticleError,
     ArchivedCategoryError,
+    ArchivedCFOError,
+    ArchivedMRPError,
     ArticleCategoryMismatchError,
     BudgetArticleNotFoundError,
     CategoryNotFoundError,
     CFONotFoundError,
     DictionariesDomainError,
     DictionariesFeatureError,
+    DistributionRuleNotFoundError,
     DuplicateDictionaryNameError,
+    DuplicateDistributionRuleError,
     InvalidDictionaryNameError,
     MRPNotFoundError,
 )
@@ -24,47 +29,68 @@ EXPECTED_CATEGORY_ID = uuid4()
 PROVIDED_CATEGORY_ID = uuid4()
 MRP_ID = uuid4()
 CFO_ID = uuid4()
+RULE_ID = uuid4()
 
 
 @pytest.mark.parametrize(
     ("error", "expected_status", "expected_code", "expected_context"),
     [
-        (CFONotFoundError(CFO_ID), 404, "cfo_not_found", {"cfo_id": str(CFO_ID)}),
+        (CFONotFoundError(cfo_id=CFO_ID), 404, "cfo_not_found", {"cfo_id": str(CFO_ID)}),
         (
-            MRPNotFoundError(MRP_ID),
+            MRPNotFoundError(mrp_id=MRP_ID),
             404,
             "mrp_not_found",
             {"mrp_id": str(MRP_ID)},
         ),
         (
-            CategoryNotFoundError(CATEGORY_ID),
+            CategoryNotFoundError(category_id=CATEGORY_ID),
             404,
             "category_not_found",
             {"category_id": str(CATEGORY_ID)},
         ),
         (
-            BudgetArticleNotFoundError(ARTICLE_ID),
+            BudgetArticleNotFoundError(article_id=ARTICLE_ID),
             404,
             "budget_article_not_found",
             {"article_id": str(ARTICLE_ID)},
         ),
         (
-            DuplicateDictionaryNameError("Такси"),
+            DuplicateDictionaryNameError(name="Такси"),
             409,
             "duplicate_dictionary_name",
             {"name": "Такси"},
         ),
         (
-            ArchivedCategoryError(CATEGORY_ID),
+            ArchivedCategoryError(category_id=CATEGORY_ID),
             409,
             "archived_category",
             {"category_id": str(CATEGORY_ID)},
         ),
+        (ArchivedCFOError(cfo_id=CFO_ID), 409, "archived_cfo", {"cfo_id": str(CFO_ID)}),
+        (
+            ArchivedBudgetArticleError(article_id=ARTICLE_ID),
+            409,
+            "archived_budget_article",
+            {"article_id": str(ARTICLE_ID)},
+        ),
+        (ArchivedMRPError(mrp_id=MRP_ID), 409, "archived_mrp", {"mrp_id": str(MRP_ID)}),
+        (
+            DuplicateDistributionRuleError(rule_id=RULE_ID),
+            409,
+            "duplicate_savings_distribution_rule",
+            {"rule_id": str(RULE_ID)},
+        ),
+        (
+            DistributionRuleNotFoundError(rule_id=RULE_ID),
+            404,
+            "savings_distribution_rule_not_found",
+            {"rule_id": str(RULE_ID)},
+        ),
         (
             ArticleCategoryMismatchError(
-                ARTICLE_ID,
-                EXPECTED_CATEGORY_ID,
-                PROVIDED_CATEGORY_ID,
+                article_id=ARTICLE_ID,
+                expected_category_id=EXPECTED_CATEGORY_ID,
+                provided_category_id=PROVIDED_CATEGORY_ID,
             ),
             409,
             "article_category_mismatch",
