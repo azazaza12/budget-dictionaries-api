@@ -7,6 +7,7 @@ from .presentation.cfos import router as cfos_router
 from .presentation.distribution_rules import router as distribution_rules_router
 from .presentation.error_mapping import dictionaries_error
 from .presentation.mrps import router as mrps_router
+from .presentation.organizations import router as organizations_router
 
 
 def register(app: FastAPI) -> None:
@@ -17,3 +18,4 @@ def register(app: FastAPI) -> None:
     app.include_router(distribution_rules_router)
     app.add_exception_handler(DictionariesDomainError, dictionaries_error)
     app.add_exception_handler(DictionariesFeatureError, dictionaries_error)
+    app.include_router(organizations_router)

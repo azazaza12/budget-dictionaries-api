@@ -15,11 +15,13 @@ from .domain import (
     DictionariesDomainError,
     DistributionRule,
     InvalidDictionaryNameError,
+    Organization,
 )
 from .features.archive_article import archive_article as archive_article_feature
 from .features.archive_category import archive_category as archive_category_feature
 from .features.archive_cfo import archive_cfo as archive_cfo_feature
 from .features.archive_mrp import archive_mrp as archive_mrp_feature
+from .features.archive_organization import archive_organization as archive_organization_feature
 from .features.create_article import create_article as create_article_feature
 from .features.create_category import create_category as create_category_feature
 from .features.create_cfo import create_cfo as create_cfo_feature
@@ -27,6 +29,7 @@ from .features.create_distribution_rule import (
     create_distribution_rule as create_distribution_rule_feature,
 )
 from .features.create_mrp import create_mrp as create_mrp_feature
+from .features.create_organization import create_organization as create_organization_feature
 from .features.delete_distribution_rule import (
     delete_distribution_rule as delete_distribution_rule_feature,
 )
@@ -38,7 +41,9 @@ from .features.errors import (
     DistributionRuleNotFoundError,
     DuplicateDictionaryNameError,
     DuplicateDistributionRuleError,
+    DuplicateOrganizationExternalNameError,
     MRPNotFoundError,
+    OrganizationNotFoundError,
 )
 from .features.get_distribution_rule import (
     get_distribution_rule as get_distribution_rule_feature,
@@ -50,6 +55,7 @@ from .features.list_distribution_rules import (
     list_distribution_rules as list_distribution_rules_feature,
 )
 from .features.list_mrps import list_mrps as list_mrps_feature
+from .features.list_organizations import list_organizations as list_organizations_feature
 from .features.move_article import move_article as move_article_feature
 from .features.recommend_mrp import (
     recommend_mrp as recommend_mrp_feature,
@@ -58,10 +64,12 @@ from .features.rename_article import rename_article as rename_article_feature
 from .features.rename_category import rename_category as rename_category_feature
 from .features.rename_cfo import rename_cfo as rename_cfo_feature
 from .features.rename_mrp import rename_mrp as rename_mrp_feature
+from .features.rename_organization import rename_organization as rename_organization_feature
 from .features.restore_article import restore_article as restore_article_feature
 from .features.restore_category import restore_category as restore_category_feature
 from .features.restore_cfo import restore_cfo as restore_cfo_feature
 from .features.restore_mrp import restore_mrp as restore_mrp_feature
+from .features.restore_organization import restore_organization as restore_organization_feature
 from .features.update_distribution_rule import (
     update_distribution_rule as update_distribution_rule_feature,
 )
@@ -72,6 +80,7 @@ from .repository import (
     SqlAlchemyCFORepository,
     SqlAlchemyDistributionRuleRepository,
     SqlAlchemyMRPRepository,
+    SqlAlchemyOrganizationRepository,
 )
 
 __all__ = (
@@ -89,8 +98,10 @@ __all__ = (
     "DistributionRuleNotFoundError",
     "DuplicateDictionaryNameError",
     "DuplicateDistributionRuleError",
+    "DuplicateOrganizationExternalNameError",
     "InvalidDictionaryNameError",
     "MRPNotFoundError",
+    "OrganizationNotFoundError",
 )
 
 
@@ -102,6 +113,7 @@ class DictionariesFacade:
         self._mrp_repository = SqlAlchemyMRPRepository(session)
         self._cfo_repository = SqlAlchemyCFORepository(session)
         self._rule_repository = SqlAlchemyDistributionRuleRepository(session)
+        self._organization_repository = SqlAlchemyOrganizationRepository(session)
 
     async def create_category(self, name: str) -> Category:
         async with self._session.begin():
@@ -267,3 +279,30 @@ class DictionariesFacade:
             mrp_repository=self._mrp_repository,
             rule_repository=self._rule_repository,
         )
+
+    async def create_organization(self, name: str, external_name: str) -> Organization:
+        async with self._session.begin():
+            return await create_organization_feature(
+                name, external_name, self._organization_repository
+            )
+
+    async def archive_organization(self, id: UUID) -> Organization:
+        async with self._session.begin():
+            return await archive_organization_feature(id, self._organization_repository)
+
+    async def restore_organization(self, id: UUID) -> Organization:
+        async with self._session.begin():
+            return await restore_organization_feature(id, self._organization_repository)
+
+    async def list_organizations(self, *, include_archived: bool = False) -> list[Organization]:
+        return await list_organizations_feature(
+            self._organization_repository, include_archived=include_archived
+        )
+
+    async def rename_organization(
+        self, id: UUID, new_name: str, new_external_name: str
+    ) -> Organization:
+        async with self._session.begin():
+            return await rename_organization_feature(
+                id, new_name, new_external_name, self._organization_repository
+            )

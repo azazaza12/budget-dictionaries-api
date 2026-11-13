@@ -59,12 +59,34 @@ def test_application_exposes_all_dictionary_routes(dictionaries_api: Dictionarie
         "/dictionaries/savings-distribution-rules/recommendation": {"get"},
         "/dictionaries/savings-distribution-rules": {"get", "post"},
         "/dictionaries/savings-distribution-rules/{rule_id}": {"get", "put", "delete"},
+        "/dictionaries/organizations": {"get", "post"},
+        "/dictionaries/organizations/{organization_id}": {"put"},
+        "/dictionaries/organizations/{organization_id}/archive": {"post"},
+        "/dictionaries/organizations/{organization_id}/restore": {"post"},
     }
     for path, methods in expected_routes.items():
         assert set(paths[path]) == methods
 
 
-@pytest.mark.parametrize("resource", ["categories", "articles", "mrps", "cfos"])
+@pytest.mark.parametrize(
+    ("schema_name", "fields"),
+    [
+        ("OrganizationInput", {"name", "external_name"}),
+        ("OrganizationView", {"id", "name", "external_name", "is_archived"}),
+    ],
+)
+def test_organization_openapi_schema_exposes_external_name(
+    schema_name: str, fields: set[str], dictionaries_api: DictionariesApi
+) -> None:
+    response = dictionaries_api.client.get("/openapi.json")
+
+    assert response.status_code == 200
+    schema = response.json()["components"]["schemas"][schema_name]
+    assert set(schema["properties"]) == fields
+    assert set(schema["required"]) == fields
+
+
+@pytest.mark.parametrize("resource", ["categories", "articles", "mrps", "cfos", "organizations"])
 def test_application_serves_dictionary_lists(
     resource: str,
     dictionaries_api: DictionariesApi,

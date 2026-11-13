@@ -71,6 +71,12 @@ def normalize_name(value: str) -> str:
     return clean_name(value).casefold()
 
 
+def normalize_external_name(value: str) -> str:
+    cleaned_name = clean_name(value)
+    quote_translation = str.maketrans({"«": '"', "»": '"', "“": '"', "”": '"', "„": '"'})
+    return cleaned_name.translate(quote_translation).casefold()
+
+
 @dataclass(slots=True, kw_only=True)
 class BaseDictionary:
     name: str
@@ -173,3 +179,23 @@ class DistributionRule:
         self.cfo_id = cfo.id
         self.budget_article_id = budget_article.id
         self.mrp_id = mrp.id
+
+
+@dataclass(slots=True, kw_only=True)
+class Organization(BaseDictionary):
+    external_name: str
+
+    def __post_init__(self) -> None:
+        self.name = clean_name(self.name)
+        self.external_name = clean_name(self.external_name)
+
+    @property
+    def normalized_external_name(self) -> str:
+        return normalize_external_name(self.external_name)
+
+    def restore(self) -> None:
+        self.is_archived = False
+
+    def rename_external_name(self, new_name: str) -> None:
+        cleaned_name = clean_name(new_name)
+        self.external_name = cleaned_name

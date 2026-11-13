@@ -5,13 +5,14 @@ from uuid import UUID
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .domain import CFO, MRP, BudgetArticle, Category, DistributionRule
+from .domain import CFO, MRP, BudgetArticle, Category, DistributionRule, Organization
 from .models import (
     BudgetArticleModel,
     CategoryModel,
     CFOModel,
     DistributionRuleModel,
     MRPModel,
+    OrganizationModel,
 )
 
 
@@ -104,6 +105,24 @@ class DistributionRuleRepository(Protocol):
     async def save(self, rule: DistributionRule) -> None: ...
 
     async def delete(self, rule: DistributionRule) -> None: ...
+
+
+class OrganizationRepository(Protocol):
+    async def get(self, id: UUID) -> Organization | None: ...
+
+    async def add(self, organization: Organization) -> None: ...
+
+    async def list(self, *, include_archived: bool = False) -> list[Organization]: ...
+
+    async def save(self, organization: Organization) -> None: ...
+
+    async def name_exists(
+        self, normalized_name: str, *, exclude_id: UUID | None = None
+    ) -> bool: ...
+
+    async def external_name_exists(
+        self, normalized_external_name: str, *, exclude_id: UUID | None = None
+    ) -> bool: ...
 
 
 class SqlAlchemyCategoryRepository:
@@ -402,3 +421,70 @@ class SqlAlchemyDistributionRuleRepository:
             )
             for rule, cfo, article, category, mrp in rows
         ]
+
+
+class SqlAlchemyOrganizationRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    @staticmethod
+    def _to_domain(model: OrganizationModel) -> Organization:
+        return Organization(
+            id=model.id,
+            name=model.name,
+            external_name=model.external_name,
+            is_archived=model.is_archived,
+        )
+
+    @staticmethod
+    def _to_model(organization: Organization) -> OrganizationModel:
+        return OrganizationModel(
+            id=organization.id,
+            name=organization.name,
+            external_name=organization.external_name,
+            normalized_name=organization.normalized_name,
+            normalized_external_name=organization.normalized_external_name,
+            is_archived=organization.is_archived,
+        )
+
+    async def get(self, id: UUID) -> Organization | None:
+        model = await self._session.get(OrganizationModel, id)
+        if model is None:
+            return None
+        return self._to_domain(model)
+
+    async def add(self, organization: Organization) -> None:
+        self._session.add(self._to_model(organization))
+
+    async def list(self, *, include_archived: bool = False) -> list[Organization]:
+        statement = select(OrganizationModel)
+        if not include_archived:
+            statement = statement.where(OrganizationModel.is_archived.is_(False))
+        statement = statement.order_by(OrganizationModel.normalized_name, OrganizationModel.id)
+
+        organizations = await self._session.scalars(statement)
+        return [self._to_domain(model) for model in organizations]
+
+    async def save(self, organization: Organization) -> None:
+        model = self._to_model(organization)
+        await self._session.merge(model)
+
+    async def name_exists(self, normalized_name: str, *, exclude_id: UUID | None = None) -> bool:
+        query = select(OrganizationModel.id).where(
+            OrganizationModel.normalized_name == normalized_name
+        )
+        if exclude_id is not None:
+            query = query.where(OrganizationModel.id != exclude_id)
+        statement = select(query.exists())
+        return bool(await self._session.scalar(statement))
+
+    async def external_name_exists(
+        self, normalized_external_name: str, *, exclude_id: UUID | None = None
+    ) -> bool:
+        query = select(OrganizationModel.id).where(
+            OrganizationModel.normalized_external_name == normalized_external_name
+        )
+        if exclude_id is not None:
+            query = query.where(OrganizationModel.id != exclude_id)
+        statement = select(query.exists())
+        return bool(await self._session.scalar(statement))

@@ -72,3 +72,16 @@ class DistributionRuleModel(Base):
     mrp_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("mrp.id", ondelete="RESTRICT"), nullable=False
     )
+
+
+class OrganizationModel(Base):
+    __tablename__ = "organizations"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    external_name: Mapped[str] = mapped_column(Text, nullable=False)
+    is_archived: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    normalized_external_name: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    normalized_name: Mapped[str] = mapped_column(Text, nullable=False, unique=True)

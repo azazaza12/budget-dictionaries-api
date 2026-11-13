@@ -98,3 +98,19 @@ class DistributionRuleDetailsView(BaseModel):
     budget_article: BudgetArticleView
     category: CategoryView
     mrp: MRPView
+
+
+class OrganizationInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    external_name: str
+
+
+class OrganizationView(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    external_name: str
+    is_archived: bool

@@ -7,6 +7,7 @@ from sigma.modules.dictionaries.models import (
     CFOModel,
     DistributionRuleModel,
     MRPModel,
+    OrganizationModel,
 )
 
 
@@ -132,3 +133,32 @@ def test_distribution_rule_foreign_keys_restrict_deletion(column_name: str, targ
     assert foreign_key.target_fullname == target
     assert foreign_key.ondelete == "RESTRICT"
     assert foreign_key.column is table.metadata.tables[target.split(".", maxsplit=1)[0]].c.id
+
+
+def test_organization_model_schema() -> None:
+    table = OrganizationModel.__table__
+    assert isinstance(table, Table)
+
+    assert OrganizationModel.__tablename__ == "organizations"
+    assert set(table.columns.keys()) == {
+        "id",
+        "name",
+        "external_name",
+        "normalized_name",
+        "normalized_external_name",
+        "is_archived",
+    }
+    assert table.c.id.primary_key
+    assert all(not column.nullable for column in table.columns)
+    assert table.c.is_archived.default is not None
+    assert table.c.is_archived.server_default is not None
+    assert str(table.c.is_archived.server_default.arg) == "false"
+    unique_constraints = {
+        constraint.name: list(constraint.columns.keys())
+        for constraint in table.constraints
+        if isinstance(constraint, UniqueConstraint)
+    }
+    assert unique_constraints == {
+        "uq_organizations_normalized_name": ["normalized_name"],
+        "uq_organizations_normalized_external_name": ["normalized_external_name"],
+    }
