@@ -904,7 +904,9 @@ def test_rename_organization_error_exits_transaction_unchanged(error: Exception)
         patch("sigma.modules.dictionaries.facade.rename_organization_feature", feature),
         pytest.raises(type(error)) as caught,
     ):
-        asyncio.run(DictionariesFacade(session).rename_organization(uuid4(), "Пример", "ООО «Пример»"))
+        asyncio.run(
+            DictionariesFacade(session).rename_organization(uuid4(), "Пример", "ООО «Пример»")
+        )
 
     assert caught.value is error
     feature.assert_awaited_once()
@@ -976,7 +978,10 @@ def test_list_organizations_excludes_archived_by_default() -> None:
 
 @pytest.mark.parametrize(
     "error",
-    [DuplicateDictionaryNameError("Пример"), DuplicateOrganizationExternalNameError("ООО «Пример»")],
+    [
+        DuplicateDictionaryNameError("Пример"),
+        DuplicateOrganizationExternalNameError("ООО «Пример»"),
+    ],
 )
 def test_create_organization_feature_error_exits_transaction_unchanged(
     error: DuplicateDictionaryNameError | DuplicateOrganizationExternalNameError,

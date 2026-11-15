@@ -92,6 +92,7 @@ reportUnusedVariable = "error"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]  # flat layout: пакет sigma в корне
+markers = ["postgres: opt-in migration and HTTP integration checks on a disposable PostgreSQL database"]
 
 # ---------- import-linter ----------
 # Архитектурные границы как код: lint-imports падает при нарушении.
